@@ -122,4 +122,52 @@ export interface ParameterQuestionSet {
 
 export interface ParameterSelections {
   [questionId: string]: string; // Maps question ID to selected option ID
+}
+
+// Structured case parameters derived from parameter selections
+export interface VitalSigns {
+  heartRate: { min: number; max: number };
+  respiratoryRate: { min: number; max: number };
+  bloodPressure: { systolic: { min: number; max: number }; diastolic: { min: number; max: number } };
+  temperature: { min: number; max: number };
+  oxygenSaturation: { min: number; max: number };
+  consciousness: string;
+}
+
+export interface PatientDemographics {
+  ageRange: string;
+  gender?: string;
+  occupation?: string;
+  socialContext?: string;
+  relevantHistory?: string[];
+}
+
+export interface ClinicalContext {
+  setting: string;
+  acuityLevel: string;
+  availableResources: string[];
+  timelineSpan: string;
+}
+
+export interface PresentationComplexity {
+  primaryConditionSeverity: string;
+  comorbidities: string[];
+  communicationChallenges: string[];
+  abnormalFindings: string[];
+}
+
+export interface EducationalElements {
+  documentationTypes: string[];
+  learnerDecisionPoints: string[];
+  criticalActions: string[];
+  assessmentFocus: string[];
+}
+
+export interface CaseParameters {
+  demographics: PatientDemographics;
+  clinicalContext: ClinicalContext;
+  complexity: PresentationComplexity;
+  educationalElements: EducationalElements;
+  recommendedVitalSigns: VitalSigns;
+  learningObjectives: LearningObjective[];
 } 

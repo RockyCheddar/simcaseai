@@ -3,11 +3,10 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { analyzeObjectives } from '@/lib/api/ai-service';
-import { LearningObjective } from '@/types/case';
+import { LearningObjective, ParameterSelections, CaseParameters } from '@/types/case';
 import { toast } from 'react-hot-toast';
 import ObjectivesAnalysisStep from './ObjectivesAnalysisStep';
 import ParameterQuestionsStep from './ParameterQuestionsStep';
-import { ParameterSelections } from '@/types/case';
 
 // Step identifiers for the workflow
 type CreationStep =
@@ -31,6 +30,7 @@ export default function NewCasePage() {
   const [suggestedObjectives, setSuggestedObjectives] = useState<LearningObjective[]>([]);
   const [finalObjectives, setFinalObjectives] = useState<LearningObjective[]>([]);
   const [parameterSelections, setParameterSelections] = useState<ParameterSelections>({});
+  const [caseParameters, setCaseParameters] = useState<CaseParameters | null>(null);
   const [newObjective, setNewObjective] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -81,8 +81,9 @@ export default function NewCasePage() {
   };
 
   // Function to handle completed parameter questions
-  const handleParametersComplete = (selections: ParameterSelections) => {
+  const handleParametersComplete = (selections: ParameterSelections, mappedParameters: CaseParameters) => {
     setParameterSelections(selections);
+    setCaseParameters(mappedParameters);
     setCurrentStep('drafting'); // Or the next appropriate step
     toast.success('Case parameters defined successfully!');
   };
@@ -257,26 +258,180 @@ export default function NewCasePage() {
         );
       
       case 'drafting':
-        // Placeholder for the drafting step
+        // Display the mapped parameters for review
         return (
           <div className="max-w-3xl mx-auto">
-            <h2 className="text-xl font-semibold mb-6">Drafting Case</h2>
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <p className="text-gray-700 mb-4">
-                Based on your learning objectives and parameter selections, the system would now generate the complete case.
-              </p>
-              <p className="text-gray-700 mb-4">
-                This would include patient details, clinical data, progression scenarios, and supporting materials.
-              </p>
-              <div className="flex justify-center">
-                <button 
-                  onClick={() => setCurrentStep('parameters')} 
-                  className="btn bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
-                >
-                  Back to Parameters
-                </button>
+            <h2 className="text-xl font-semibold mb-6">Case Parameters Defined</h2>
+            
+            {caseParameters && (
+              <div className="bg-white p-6 rounded-lg shadow-md mb-6">
+                <p className="text-gray-700 mb-6">
+                  Based on your selections, the following parameters will be used to generate your simulation case:
+                </p>
+                
+                <div className="space-y-6">
+                  {/* Demographics section */}
+                  <div>
+                    <h3 className="text-md font-semibold mb-2 text-primary-600">Patient Demographics</h3>
+                    <div className="bg-gray-50 p-4 rounded-md">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <span className="text-sm font-medium text-gray-500">Age Range:</span>
+                          <p className="text-gray-800">{caseParameters.demographics.ageRange}</p>
+                        </div>
+                        {caseParameters.demographics.gender && (
+                          <div>
+                            <span className="text-sm font-medium text-gray-500">Gender:</span>
+                            <p className="text-gray-800">{caseParameters.demographics.gender}</p>
+                          </div>
+                        )}
+                        {caseParameters.demographics.occupation && (
+                          <div>
+                            <span className="text-sm font-medium text-gray-500">Occupation:</span>
+                            <p className="text-gray-800">{caseParameters.demographics.occupation}</p>
+                          </div>
+                        )}
+                        {caseParameters.demographics.socialContext && (
+                          <div>
+                            <span className="text-sm font-medium text-gray-500">Social Context:</span>
+                            <p className="text-gray-800">{caseParameters.demographics.socialContext}</p>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {caseParameters.demographics.relevantHistory && caseParameters.demographics.relevantHistory.length > 0 && (
+                        <div className="mt-3">
+                          <span className="text-sm font-medium text-gray-500">Relevant History:</span>
+                          <ul className="list-disc pl-5 mt-1 text-gray-800">
+                            {caseParameters.demographics.relevantHistory.map((item, index) => (
+                              <li key={index}>{item}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Clinical Context section */}
+                  <div>
+                    <h3 className="text-md font-semibold mb-2 text-primary-600">Clinical Context</h3>
+                    <div className="bg-gray-50 p-4 rounded-md">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <span className="text-sm font-medium text-gray-500">Setting:</span>
+                          <p className="text-gray-800">{caseParameters.clinicalContext.setting}</p>
+                        </div>
+                        <div>
+                          <span className="text-sm font-medium text-gray-500">Acuity Level:</span>
+                          <p className="text-gray-800">{caseParameters.clinicalContext.acuityLevel}</p>
+                        </div>
+                        {caseParameters.clinicalContext.timelineSpan && (
+                          <div>
+                            <span className="text-sm font-medium text-gray-500">Timeline:</span>
+                            <p className="text-gray-800">{caseParameters.clinicalContext.timelineSpan}</p>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {caseParameters.clinicalContext.availableResources.length > 0 && (
+                        <div className="mt-3">
+                          <span className="text-sm font-medium text-gray-500">Available Resources:</span>
+                          <ul className="list-disc pl-5 mt-1 text-gray-800">
+                            {caseParameters.clinicalContext.availableResources.map((resource, index) => (
+                              <li key={index}>{resource}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Complexity section */}
+                  <div>
+                    <h3 className="text-md font-semibold mb-2 text-primary-600">Presentation Complexity</h3>
+                    <div className="bg-gray-50 p-4 rounded-md">
+                      <div>
+                        <span className="text-sm font-medium text-gray-500">Primary Condition Severity:</span>
+                        <p className="text-gray-800">{caseParameters.complexity.primaryConditionSeverity}</p>
+                      </div>
+                      
+                      {caseParameters.complexity.comorbidities.length > 0 && (
+                        <div className="mt-3">
+                          <span className="text-sm font-medium text-gray-500">Comorbidities:</span>
+                          <ul className="list-disc pl-5 mt-1 text-gray-800">
+                            {caseParameters.complexity.comorbidities.map((item, index) => (
+                              <li key={index}>{item}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      
+                      {caseParameters.complexity.communicationChallenges.length > 0 && (
+                        <div className="mt-3">
+                          <span className="text-sm font-medium text-gray-500">Communication Challenges:</span>
+                          <ul className="list-disc pl-5 mt-1 text-gray-800">
+                            {caseParameters.complexity.communicationChallenges.map((item, index) => (
+                              <li key={index}>{item}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Vital Signs section */}
+                  <div>
+                    <h3 className="text-md font-semibold mb-2 text-primary-600">Recommended Vital Signs</h3>
+                    <div className="bg-gray-50 p-4 rounded-md">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <span className="text-sm font-medium text-gray-500">Heart Rate:</span>
+                          <p className="text-gray-800">{caseParameters.recommendedVitalSigns.heartRate.min}-{caseParameters.recommendedVitalSigns.heartRate.max} bpm</p>
+                        </div>
+                        <div>
+                          <span className="text-sm font-medium text-gray-500">Respiratory Rate:</span>
+                          <p className="text-gray-800">{caseParameters.recommendedVitalSigns.respiratoryRate.min}-{caseParameters.recommendedVitalSigns.respiratoryRate.max} /min</p>
+                        </div>
+                        <div>
+                          <span className="text-sm font-medium text-gray-500">Blood Pressure:</span>
+                          <p className="text-gray-800">{caseParameters.recommendedVitalSigns.bloodPressure.systolic.min}-{caseParameters.recommendedVitalSigns.bloodPressure.systolic.max}/{caseParameters.recommendedVitalSigns.bloodPressure.diastolic.min}-{caseParameters.recommendedVitalSigns.bloodPressure.diastolic.max} mmHg</p>
+                        </div>
+                        <div>
+                          <span className="text-sm font-medium text-gray-500">Temperature:</span>
+                          <p className="text-gray-800">{caseParameters.recommendedVitalSigns.temperature.min}-{caseParameters.recommendedVitalSigns.temperature.max}°C</p>
+                        </div>
+                        <div>
+                          <span className="text-sm font-medium text-gray-500">Oxygen Saturation:</span>
+                          <p className="text-gray-800">{caseParameters.recommendedVitalSigns.oxygenSaturation.min}-{caseParameters.recommendedVitalSigns.oxygenSaturation.max}%</p>
+                        </div>
+                        <div>
+                          <span className="text-sm font-medium text-gray-500">Consciousness:</span>
+                          <p className="text-gray-800">{caseParameters.recommendedVitalSigns.consciousness}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex justify-between mt-8">
+                  <button 
+                    onClick={() => setCurrentStep('parameters')} 
+                    className="btn bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+                  >
+                    Back to Parameters
+                  </button>
+                  <button 
+                    onClick={() => {
+                      // Here you would proceed to generating the full case
+                      toast.success('Case drafting would begin here with the defined parameters');
+                    }} 
+                    className="btn-primary"
+                  >
+                    Generate Case
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         );
       

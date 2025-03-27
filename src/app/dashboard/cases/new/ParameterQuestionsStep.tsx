@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ParameterQuestion, ParameterQuestionSet, ParameterSelections, LearningObjective } from '@/types/case';
+import { ParameterQuestion, ParameterQuestionSet, ParameterSelections, LearningObjective, CaseParameters } from '@/types/case';
 import { generateCaseParameterQuestions } from '@/lib/api/ai-service';
+import { mapParametersToCase } from '@/lib/parameter-mapper';
 import { toast } from 'react-hot-toast';
 
 interface ParameterQuestionsStepProps {
   objectives: LearningObjective[];
-  onComplete: (parameterSelections: ParameterSelections) => void;
+  onComplete: (parameterSelections: ParameterSelections, mappedParameters: CaseParameters) => void;
   onBack: () => void;
 }
 
@@ -71,8 +72,20 @@ export default function ParameterQuestionsStep({
     if (currentQuestionIndex < questionSet.questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
-      // All questions answered, proceed to completion
-      onComplete(selections);
+      // All questions answered, map the selections to case parameters
+      if (questionSet) {
+        const mappedParameters = mapParametersToCase(
+          questionSet.questions,
+          selections,
+          objectives
+        );
+        
+        // Log the mapped parameters for debugging
+        console.log('Mapped parameters:', mappedParameters);
+        
+        // Complete this step with both selections and mapped parameters
+        onComplete(selections, mappedParameters);
+      }
     }
   };
   
@@ -91,6 +104,12 @@ export default function ParameterQuestionsStep({
     if (!questionSet) return false;
     const currentQuestion = questionSet.questions[currentQuestionIndex];
     return !!selections[currentQuestion.id];
+  };
+  
+  // Calculate progress percentage
+  const calculateProgress = () => {
+    if (!questionSet || questionSet.questions.length === 0) return 0;
+    return (Object.keys(selections).length / questionSet.questions.length) * 100;
   };
   
   // Render the current question
@@ -227,9 +246,7 @@ export default function ParameterQuestionsStep({
           <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
             <div 
               className="h-full bg-primary-500" 
-              style={{ 
-                width: `${(Object.keys(selections).length / questionSet.questions.length) * 100}%` 
-              }}
+              style={{ width: `${calculateProgress()}%` }}
             ></div>
           </div>
           <div className="flex justify-between mt-2 text-xs text-gray-500">
