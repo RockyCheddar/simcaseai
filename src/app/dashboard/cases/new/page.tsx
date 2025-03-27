@@ -2,11 +2,12 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { analyzeObjectives } from '@/lib/api/ai-service';
+import { analyzeObjectives, generateCase } from '@/lib/api/ai-service';
 import { LearningObjective, ParameterSelections, CaseParameters } from '@/types/case';
 import { toast } from 'react-hot-toast';
 import ObjectivesAnalysisStep from './ObjectivesAnalysisStep';
 import ParameterQuestionsStep from './ParameterQuestionsStep';
+import MarkdownPreview from '@/components/MarkdownPreview';
 
 // Step identifiers for the workflow
 type CreationStep =
@@ -18,8 +19,9 @@ type CreationStep =
   | 'refinement'
   | 'finalObjectives'
   | 'parameters'
-  | 'answers'
   | 'drafting'
+  | 'generating'
+  | 'preview'
   | 'review'
   | 'complete';
 
@@ -31,6 +33,8 @@ export default function NewCasePage() {
   const [finalObjectives, setFinalObjectives] = useState<LearningObjective[]>([]);
   const [parameterSelections, setParameterSelections] = useState<ParameterSelections>({});
   const [caseParameters, setCaseParameters] = useState<CaseParameters | null>(null);
+  const [generatedCase, setGeneratedCase] = useState<{ text: string; title: string } | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [newObjective, setNewObjective] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -86,6 +90,30 @@ export default function NewCasePage() {
     setCaseParameters(mappedParameters);
     setCurrentStep('drafting'); // Or the next appropriate step
     toast.success('Case parameters defined successfully!');
+  };
+
+  // Function to generate the case
+  const handleGenerateCase = async () => {
+    if (!caseParameters) {
+      toast.error('Case parameters are missing');
+      return;
+    }
+
+    setIsGenerating(true);
+    setCurrentStep('generating');
+
+    try {
+      const result = await generateCase(caseParameters);
+      setGeneratedCase(result);
+      setCurrentStep('preview');
+      toast.success('Case generated successfully!');
+    } catch (error) {
+      console.error('Error generating case:', error);
+      toast.error('Failed to generate case. Please try again.');
+      setCurrentStep('drafting');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   // Function to render the current step content
@@ -421,17 +449,105 @@ export default function NewCasePage() {
                     Back to Parameters
                   </button>
                   <button 
-                    onClick={() => {
-                      // Here you would proceed to generating the full case
-                      toast.success('Case drafting would begin here with the defined parameters');
-                    }} 
+                    onClick={handleGenerateCase} 
                     className="btn-primary"
+                    disabled={isGenerating}
                   >
                     Generate Case
                   </button>
                 </div>
               </div>
             )}
+          </div>
+        );
+        
+      case 'generating':
+        return (
+          <div className="max-w-3xl mx-auto">
+            <h2 className="text-xl font-semibold mb-6">Generating Your Simulation Case</h2>
+            <div className="bg-white p-8 rounded-lg shadow-md flex flex-col items-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mb-6"></div>
+              <p className="text-gray-700 mb-2">
+                Creating your simulation case based on the provided parameters...
+              </p>
+              <p className="text-gray-500 text-sm mb-4">
+                This may take a minute or two.
+              </p>
+              <div className="w-full max-w-md bg-gray-200 rounded-full h-2.5 mt-4">
+                <div className="bg-primary-500 h-2.5 rounded-full w-3/4 animate-pulse"></div>
+              </div>
+            </div>
+          </div>
+        );
+      
+      case 'preview':
+        return (
+          <div className="max-w-5xl mx-auto">
+            <h2 className="text-xl font-semibold mb-6">Your Generated Simulation Case</h2>
+            
+            {generatedCase ? (
+              <div className="mb-6">
+                <MarkdownPreview 
+                  markdown={generatedCase.text} 
+                  title={generatedCase.title}
+                />
+                
+                <div className="flex justify-between mt-8">
+                  <button 
+                    onClick={() => setCurrentStep('drafting')} 
+                    className="btn bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+                  >
+                    Back to Parameters
+                  </button>
+                  <button 
+                    onClick={() => {
+                      // Here you would save the case to your database
+                      toast.success('Case saved successfully!');
+                      setCurrentStep('complete');
+                    }} 
+                    className="btn-primary"
+                  >
+                    Save Case
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-red-50 p-6 rounded-lg shadow-md">
+                <h3 className="text-lg font-medium text-red-800 mb-2">Error</h3>
+                <p className="text-red-700 mb-4">No case was generated. Please try again.</p>
+                <button
+                  onClick={() => setCurrentStep('drafting')}
+                  className="btn-primary"
+                >
+                  Back to Parameters
+                </button>
+              </div>
+            )}
+          </div>
+        );
+        
+      case 'complete':
+        return (
+          <div className="max-w-3xl mx-auto text-center">
+            <div className="bg-white p-8 rounded-lg shadow-md">
+              <div className="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center mb-6">
+                <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">Simulation Case Created!</h2>
+              <p className="text-gray-600 mb-8">
+                Your simulation case has been successfully created and saved.
+              </p>
+              <div className="flex justify-center space-x-4">
+                <Link href="/dashboard/cases" className="btn bg-white border-gray-300 text-gray-700 hover:bg-gray-50">
+                  View All Cases
+                </Link>
+                <Link href="/dashboard" className="btn-primary">
+                  Return to Dashboard
+                </Link>
+              </div>
+            </div>
           </div>
         );
       
@@ -467,7 +583,8 @@ export default function NewCasePage() {
                 currentStep === 'templates' || currentStep === 'importCase' || currentStep === 'objectives' ? '20%' :
                 currentStep === 'aiAnalysis' || currentStep === 'finalObjectives' ? '40%' :
                 currentStep === 'parameters' ? '60%' :
-                currentStep === 'drafting' ? '80%' : '100%'
+                currentStep === 'drafting' || currentStep === 'generating' ? '80%' :
+                currentStep === 'preview' || currentStep === 'complete' ? '100%' : '0%'
               }}
               className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-primary-500"
             ></div>
@@ -476,7 +593,7 @@ export default function NewCasePage() {
       </div>
       
       {/* Main content */}
-      <div className="bg-white shadow rounded-lg p-6">
+      <div className={`${currentStep === 'preview' ? 'bg-transparent' : 'bg-white shadow rounded-lg'} p-6`}>
         {renderStepContent()}
       </div>
     </div>

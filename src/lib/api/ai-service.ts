@@ -495,4 +495,136 @@ export async function generateCaseParameterQuestions(objectives: string[]): Prom
       message: error instanceof Error ? error.message : String(error)
     };
   }
+}
+
+/**
+ * Generates a complete educational simulation case based on the provided parameters
+ */
+export async function generateCase(caseParameters: any): Promise<{ text: string; title: string; }> {
+  // Format the prompt for generating a complete case
+  const prompt = `
+    You are an expert in healthcare simulation case design. Create a comprehensive simulation case based on the following parameters:
+    
+    LEARNING OBJECTIVES:
+    ${caseParameters.learningObjectives.map((obj: any, i: number) => `${i + 1}. ${obj.text}`).join('\n')}
+    
+    PATIENT DEMOGRAPHICS:
+    - Age Range: ${caseParameters.demographics.ageRange}
+    ${caseParameters.demographics.gender ? `- Gender: ${caseParameters.demographics.gender}` : ''}
+    ${caseParameters.demographics.occupation ? `- Occupation: ${caseParameters.demographics.occupation}` : ''}
+    ${caseParameters.demographics.socialContext ? `- Social Context: ${caseParameters.demographics.socialContext}` : ''}
+    ${caseParameters.demographics.relevantHistory && caseParameters.demographics.relevantHistory.length > 0 
+      ? `- Relevant History: ${caseParameters.demographics.relevantHistory.join(', ')}` 
+      : ''}
+    
+    CLINICAL CONTEXT:
+    - Setting: ${caseParameters.clinicalContext.setting}
+    - Acuity Level: ${caseParameters.clinicalContext.acuityLevel}
+    ${caseParameters.clinicalContext.timelineSpan ? `- Timeline: ${caseParameters.clinicalContext.timelineSpan}` : ''}
+    - Available Resources:
+      ${caseParameters.clinicalContext.availableResources.map((resource: string) => `* ${resource}`).join('\n      ')}
+    
+    PRESENTATION COMPLEXITY:
+    - Primary Condition Severity: ${caseParameters.complexity.primaryConditionSeverity}
+    ${caseParameters.complexity.comorbidities.length > 0 
+      ? `- Comorbidities: ${caseParameters.complexity.comorbidities.join(', ')}` 
+      : ''}
+    ${caseParameters.complexity.communicationChallenges.length > 0 
+      ? `- Communication Challenges: ${caseParameters.complexity.communicationChallenges.join(', ')}` 
+      : ''}
+    ${caseParameters.complexity.abnormalFindings.length > 0 
+      ? `- Abnormal Findings: ${caseParameters.complexity.abnormalFindings.join(', ')}` 
+      : ''}
+    
+    VITAL SIGNS RANGE:
+    - Heart Rate: ${caseParameters.recommendedVitalSigns.heartRate.min}-${caseParameters.recommendedVitalSigns.heartRate.max} bpm
+    - Respiratory Rate: ${caseParameters.recommendedVitalSigns.respiratoryRate.min}-${caseParameters.recommendedVitalSigns.respiratoryRate.max} /min
+    - Blood Pressure: ${caseParameters.recommendedVitalSigns.bloodPressure.systolic.min}-${caseParameters.recommendedVitalSigns.bloodPressure.systolic.max}/${caseParameters.recommendedVitalSigns.bloodPressure.diastolic.min}-${caseParameters.recommendedVitalSigns.bloodPressure.diastolic.max} mmHg
+    - Temperature: ${caseParameters.recommendedVitalSigns.temperature.min}-${caseParameters.recommendedVitalSigns.temperature.max}°C
+    - Oxygen Saturation: ${caseParameters.recommendedVitalSigns.oxygenSaturation.min}-${caseParameters.recommendedVitalSigns.oxygenSaturation.max}%
+    - Consciousness: ${caseParameters.recommendedVitalSigns.consciousness}
+    
+    EDUCATIONAL ELEMENTS:
+    ${caseParameters.educationalElements.documentationTypes.length > 0 
+      ? `- Documentation Types: ${caseParameters.educationalElements.documentationTypes.join(', ')}` 
+      : ''}
+    ${caseParameters.educationalElements.learnerDecisionPoints.length > 0 
+      ? `- Decision Points: ${caseParameters.educationalElements.learnerDecisionPoints.join(', ')}` 
+      : ''}
+    ${caseParameters.educationalElements.criticalActions.length > 0 
+      ? `- Critical Actions: ${caseParameters.educationalElements.criticalActions.join(', ')}` 
+      : ''}
+    ${caseParameters.educationalElements.assessmentFocus.length > 0 
+      ? `- Assessment Focus: ${caseParameters.educationalElements.assessmentFocus.join(', ')}` 
+      : ''}
+    
+    Create a detailed simulation case document formatted in Markdown with the following sections:
+    
+    1. ## Case Title
+       - Create a descriptive and educational title for the case
+    
+    2. ## Learning Objectives
+       - List the learning objectives
+    
+    3. ## Patient Information
+       - Name (fictional)
+       - Age, gender, occupation
+       - Chief complaint
+       - Brief history of present illness
+       - Past medical history
+       - Medications
+       - Allergies
+       - Social history
+       - Family history
+    
+    4. ## Initial Presentation
+       - Vital signs (within the ranges specified)
+       - Physical examination findings
+       - Initial assessment
+    
+    5. ## Progression Scenarios
+       - Include at least 3 possible progression points
+       - For each progression, describe changes in condition, vital signs, and appropriate interventions
+    
+    6. ## Case Documentation
+       - Include sample documentation based on the specified documentation types
+       - Laboratory results (if applicable)
+       - Diagnostic findings (if applicable)
+    
+    7. ## Educational Notes
+       - Specific teaching points related to the case
+       - Common pitfalls or challenges
+       - Key decision points and critical actions
+    
+    8. ## Debriefing Guide
+       - Questions to discuss with learners
+       - Expected outcomes
+       - Areas for reflection
+    
+    The case should be medically accurate, educationally sound, and highly detailed to support simulation-based education.
+    Make sure the case is realistic and reflects the complexity level specified in the parameters.
+  `;
+  
+  try {
+    const response = await generateAIResponse({
+      prompt,
+      provider: 'claude', // Explicitly use Claude for this complex task
+      system: "You are an expert in healthcare simulation design with years of experience creating realistic, educationally sound simulation scenarios for healthcare education.",
+      maxTokens: 4000 // Ensure we have enough tokens for a comprehensive response
+    });
+    
+    // Extract a title from the response (assuming the first line is the title or contains the title)
+    const titleMatch = response.text.match(/# (.+)|## Case Title\s*\n+(.+)/m);
+    const title = titleMatch 
+      ? (titleMatch[1] || titleMatch[2]).trim() 
+      : "Healthcare Simulation Case";
+    
+    return {
+      text: response.text,
+      title: title
+    };
+  } catch (error) {
+    console.error('Error generating case:', error);
+    throw new Error(`Failed to generate case: ${error instanceof Error ? error.message : String(error)}`);
+  }
 } 
