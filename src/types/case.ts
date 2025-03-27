@@ -1,7 +1,7 @@
 export interface LearningObjective {
   id: string;
   text: string;
-  category: string;
+  category: 'clinical' | 'technical' | 'teamwork' | 'communication';
   isRefined: boolean;
   aiSuggested?: boolean;
 }
@@ -101,4 +101,25 @@ export interface AssessmentRubric {
     needsImprovement: string;
     weight: number;
   }[];
+}
+
+export interface ParameterOption {
+  id: string;
+  text: string;
+}
+
+export interface ParameterQuestion {
+  id: string;
+  category: string;
+  question: string;
+  options: ParameterOption[];
+  rationale: string;
+}
+
+export interface ParameterQuestionSet {
+  questions: ParameterQuestion[];
+}
+
+export interface ParameterSelections {
+  [questionId: string]: string; // Maps question ID to selected option ID
 } 

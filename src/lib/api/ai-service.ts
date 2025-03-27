@@ -419,4 +419,80 @@ export async function generateAssessmentRubrics(objectives: string[]): Promise<s
     console.error('Error generating assessment rubrics:', error);
     return `# Assessment Rubric\n\n## Learning Objectives\n\n...`; // Fallback
   }
+}
+
+export async function generateCaseParameterQuestions(objectives: string[]): Promise<Record<string, any>> {
+  // Format the prompt for generating case parameter questions
+  const prompt = `
+    As a medical education expert, analyze these learning objectives for a healthcare simulation case:
+    
+    ${objectives.map((obj, i) => `${i + 1}. ${obj}`).join('\n')}
+    
+    Generate 5-8 critical parameter questions that faculty should answer to create an effective simulation case.
+    For each question:
+    1. Create a clear, specific question related to the learning objectives
+    2. Provide 3-5 multiple-choice options
+    3. Include a brief rationale explaining why this parameter matters educationally
+    
+    Questions should cover these categories:
+    - Patient Demographics (age, social context, relevant background)
+    - Clinical Context (setting, timing, available resources)
+    - Presentation Complexity (severity, comorbidities, communication challenges)
+    - Educational Elements (documentation types, abnormal findings, decision points)
+    
+    Structure the response as a JSON object with this format:
+    {
+      "questions": [
+        {
+          "id": "q1",
+          "category": "Patient Demographics",
+          "question": "What is the age range of the patient?",
+          "options": [
+            {"id": "q1_a", "text": "18-30 years"},
+            {"id": "q1_b", "text": "31-50 years"},
+            {"id": "q1_c", "text": "51-70 years"},
+            {"id": "q1_d", "text": "71+ years"}
+          ],
+          "rationale": "Patient age affects clinical presentation, treatment options, and comorbidity likelihood."
+        },
+        // more questions...
+      ]
+    }
+  `;
+  
+  try {
+    const response = await generateAIResponse({
+      prompt,
+      provider: 'claude', // Explicitly use Claude for this task
+      system: "You are an expert in medical education and healthcare simulation design. Your role is to help faculty create realistic, educationally sound simulation cases by generating thoughtful questions that will define key case parameters.",
+      maxTokens: 4000 // Ensure we have enough tokens for a comprehensive response
+    });
+    
+    // Extract and parse the JSON from the response
+    const jsonMatch = response.text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        const parsedQuestions = JSON.parse(jsonMatch[0]);
+        return parsedQuestions;
+      } catch (parseError) {
+        console.error('Error parsing question JSON:', parseError);
+        return { 
+          error: "Failed to parse response format",
+          rawResponse: response.text
+        };
+      }
+    }
+    
+    // Fallback if JSON parsing fails
+    return {
+      error: "Failed to generate properly formatted questions",
+      rawResponse: response.text
+    };
+  } catch (error) {
+    console.error('Error generating case parameter questions:', error);
+    return {
+      error: "Error occurred while generating questions",
+      message: error instanceof Error ? error.message : String(error)
+    };
+  }
 } 

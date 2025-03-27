@@ -6,6 +6,8 @@ import { analyzeObjectives } from '@/lib/api/ai-service';
 import { LearningObjective } from '@/types/case';
 import { toast } from 'react-hot-toast';
 import ObjectivesAnalysisStep from './ObjectivesAnalysisStep';
+import ParameterQuestionsStep from './ParameterQuestionsStep';
+import { ParameterSelections } from '@/types/case';
 
 // Step identifiers for the workflow
 type CreationStep =
@@ -28,6 +30,7 @@ export default function NewCasePage() {
   const [objectives, setObjectives] = useState<LearningObjective[]>([]);
   const [suggestedObjectives, setSuggestedObjectives] = useState<LearningObjective[]>([]);
   const [finalObjectives, setFinalObjectives] = useState<LearningObjective[]>([]);
+  const [parameterSelections, setParameterSelections] = useState<ParameterSelections>({});
   const [newObjective, setNewObjective] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -70,6 +73,18 @@ export default function NewCasePage() {
   const handleAnalysisComplete = (refinedObjectives: LearningObjective[]) => {
     setFinalObjectives(refinedObjectives);
     setCurrentStep('finalObjectives');
+  };
+
+  // Function to move to parameters step
+  const proceedToParameters = () => {
+    setCurrentStep('parameters');
+  };
+
+  // Function to handle completed parameter questions
+  const handleParametersComplete = (selections: ParameterSelections) => {
+    setParameterSelections(selections);
+    setCurrentStep('drafting'); // Or the next appropriate step
+    toast.success('Case parameters defined successfully!');
   };
 
   // Function to render the current step content
@@ -197,48 +212,85 @@ export default function NewCasePage() {
       case 'finalObjectives':
         return (
           <div className="max-w-3xl mx-auto">
-            <h2 className="text-xl font-semibold mb-6">Final Learning Objectives</h2>
-            <p className="text-gray-600 mb-6">
-              These are the final learning objectives that will guide your simulation case design.
-            </p>
+            <h2 className="text-xl font-semibold mb-6">Refined Learning Objectives</h2>
             
-            <div className="bg-green-50 border border-green-200 rounded-md p-4 mb-6">
-              <h3 className="text-md font-medium text-green-800 mb-2">Selected Objectives:</h3>
-              <ul className="space-y-2">
+            <div className="bg-white p-6 rounded-lg shadow-md mb-6">
+              <p className="text-gray-700 mb-4">
+                The AI has refined your learning objectives to ensure they are specific, measurable, and aligned with healthcare education best practices.
+              </p>
+              
+              <h3 className="text-md font-medium mb-3">Final Learning Objectives:</h3>
+              <ul className="space-y-3">
                 {finalObjectives.map((obj, index) => (
                   <li key={obj.id} className="flex items-baseline">
-                    <span className="text-green-500 mr-2">{index + 1}.</span>
-                    <span className="text-green-700">{obj.text}</span>
+                    <span className="text-primary-600 mr-2">{index + 1}.</span>
+                    <span className="text-gray-800">{obj.text}</span>
                   </li>
                 ))}
               </ul>
             </div>
             
             <div className="flex justify-between">
-              <button onClick={() => setCurrentStep('aiAnalysis')} className="btn bg-white border-gray-300 text-gray-700 hover:bg-gray-50">
-                Back to AI Analysis
+              <button 
+                onClick={() => setCurrentStep('aiAnalysis')} 
+                className="btn bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                Back to Analysis
               </button>
               <button 
-                onClick={() => setCurrentStep('parameters')} 
+                onClick={proceedToParameters} 
                 className="btn-primary"
               >
-                Continue to Case Parameters
+                Define Case Parameters
               </button>
             </div>
           </div>
         );
         
-      // Placeholder for other steps
+      case 'parameters':
+        return (
+          <ParameterQuestionsStep
+            objectives={finalObjectives}
+            onComplete={handleParametersComplete}
+            onBack={() => setCurrentStep('finalObjectives')}
+          />
+        );
+      
+      case 'drafting':
+        // Placeholder for the drafting step
+        return (
+          <div className="max-w-3xl mx-auto">
+            <h2 className="text-xl font-semibold mb-6">Drafting Case</h2>
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <p className="text-gray-700 mb-4">
+                Based on your learning objectives and parameter selections, the system would now generate the complete case.
+              </p>
+              <p className="text-gray-700 mb-4">
+                This would include patient details, clinical data, progression scenarios, and supporting materials.
+              </p>
+              <div className="flex justify-center">
+                <button 
+                  onClick={() => setCurrentStep('parameters')} 
+                  className="btn bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+                >
+                  Back to Parameters
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      
       default:
         return (
-          <div className="max-w-3xl mx-auto text-center py-12">
-            <h2 className="text-xl font-semibold mb-4">Step Under Development</h2>
-            <p className="text-gray-600 mb-8">
-              This part of the workflow is currently under development.
-            </p>
-            <Link href="/dashboard" className="btn-primary">
-              Return to Dashboard
-            </Link>
+          <div className="max-w-3xl mx-auto">
+            <h2 className="text-xl font-semibold mb-6">Unknown Step</h2>
+            <p>Please go back to the beginning and try again.</p>
+            <button 
+              onClick={() => setCurrentStep('method')} 
+              className="btn-primary mt-4"
+            >
+              Start Over
+            </button>
           </div>
         );
     }
@@ -258,9 +310,9 @@ export default function NewCasePage() {
               style={{ width: 
                 currentStep === 'method' ? '10%' : 
                 currentStep === 'templates' || currentStep === 'importCase' || currentStep === 'objectives' ? '20%' :
-                currentStep === 'aiAnalysis' || currentStep === 'refinement' ? '40%' :
-                currentStep === 'finalObjectives' || currentStep === 'parameters' ? '60%' :
-                currentStep === 'answers' || currentStep === 'drafting' ? '80%' : '100%'
+                currentStep === 'aiAnalysis' || currentStep === 'finalObjectives' ? '40%' :
+                currentStep === 'parameters' ? '60%' :
+                currentStep === 'drafting' ? '80%' : '100%'
               }}
               className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-primary-500"
             ></div>
