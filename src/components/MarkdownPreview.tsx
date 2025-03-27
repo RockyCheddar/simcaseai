@@ -3,8 +3,7 @@
 import { useState, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { jsPDF } from 'jspdf';
-import html2canvas from 'html2canvas';
+import { markdownToPdf } from '@/utils/pdfGenerator';
 
 interface MarkdownPreviewProps {
   markdown: string;
@@ -13,6 +12,7 @@ interface MarkdownPreviewProps {
 
 export default function MarkdownPreview({ markdown, title = 'Document' }: MarkdownPreviewProps) {
   const [copied, setCopied] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   
   // Function to copy markdown to clipboard
@@ -28,36 +28,25 @@ export default function MarkdownPreview({ markdown, title = 'Document' }: Markdo
   
   // Function to download as PDF
   const downloadAsPDF = async () => {
-    if (!contentRef.current) return;
-    
     try {
-      const content = contentRef.current;
-      const canvas = await html2canvas(content, {
-        scale: 2,
-        useCORS: true,
-        logging: false
-      });
+      setIsGeneratingPdf(true);
+      const pdfBlob = await markdownToPdf(markdown, title);
+      const url = URL.createObjectURL(pdfBlob);
       
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-      });
+      // Create temporary link and trigger download
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`;
+      document.body.appendChild(link);
+      link.click();
       
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = canvas.width;
-      const imgHeight = canvas.height;
-      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-      
-      const imgX = (pdfWidth - imgWidth * ratio) / 2;
-      const imgY = 0;
-      
-      pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
-      pdf.save(`${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`);
+      // Clean up
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Error generating PDF: ', err);
+    } finally {
+      setIsGeneratingPdf(false);
     }
   };
 
@@ -70,15 +59,25 @@ export default function MarkdownPreview({ markdown, title = 'Document' }: Markdo
             onClick={copyToClipboard}
             className="px-3 py-1 bg-white bg-opacity-20 text-white text-sm rounded hover:bg-opacity-30 transition"
             aria-label="Copy to clipboard"
+            disabled={isGeneratingPdf}
           >
             {copied ? 'Copied!' : 'Copy'}
           </button>
           <button
             onClick={downloadAsPDF}
-            className="px-3 py-1 bg-white bg-opacity-20 text-white text-sm rounded hover:bg-opacity-30 transition"
+            className="px-3 py-1 bg-white bg-opacity-20 text-white text-sm rounded hover:bg-opacity-30 transition flex items-center"
             aria-label="Download as PDF"
+            disabled={isGeneratingPdf}
           >
-            Download PDF
+            {isGeneratingPdf ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Generating...
+              </>
+            ) : 'Download PDF'}
           </button>
         </div>
       </div>
