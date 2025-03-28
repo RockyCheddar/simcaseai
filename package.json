@@ -24,7 +24,6 @@
     "@tiptap/extension-placeholder": "^2.11.5",
     "@tiptap/react": "^2.11.5",
     "@tiptap/starter-kit": "^2.11.5",
-    "@uploadthing/react": "^6.3.4",
     "ai": "^4.2.8",
     "html-to-pdfmake": "^2.5.1",
     "html2canvas": "^1.4.1",
@@ -39,7 +38,6 @@
     "react-markdown": "^9.0.1",
     "recharts": "^2.15.1",
     "remark-gfm": "^4.0.0",
-    "uploadthing": "^6.5.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {

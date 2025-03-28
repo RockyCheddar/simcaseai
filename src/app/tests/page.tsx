@@ -3,6 +3,14 @@
 import { useState } from 'react';
 import Link from 'next/link';
 
+interface TestFeature {
+  title: string;
+  description: string;
+  icon: JSX.Element;
+  link: string;
+  category?: string;
+}
+
 const TestCard = ({ title, description, link, icon }: { 
   title: string; 
   description: string; 
@@ -57,54 +65,52 @@ const TestFeatureIcon = {
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
       <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
     </svg>
+  ),
+  Local: (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3v-1.5m3 4.5v3.75m-9-5.25h16.5M9 10.5v1.5m3-1.5v1.5" />
+    </svg>
   )
 };
 
 export default function TestPageDashboard() {
   const [activeTab, setActiveTab] = useState('all');
   
-  const testFeatures = [
+  const testFeatures: TestFeature[] = [
     {
       title: "Case Generation",
-      description: "Generate a complete healthcare simulation case from predefined parameters.",
-      link: "/test-case-generation",
+      description: "Test the AI-powered case generation with different parameters and settings.",
       icon: TestFeatureIcon.CaseGeneration,
+      link: "/test-case-generation",
       category: "ai"
     },
     {
-      title: "Learning Objective Analysis",
-      description: "Test our AI's ability to analyze and refine learning objectives.",
-      link: "/test-ai",
-      icon: TestFeatureIcon.AI,
-      category: "ai"
-    },
-    {
-      title: "Parameter Questions",
-      description: "Experience our guided approach to defining simulation case parameters.",
-      link: "/test-parameters",
-      icon: TestFeatureIcon.Parameters,
-      category: "interface"
-    },
-    {
-      title: "File Uploads",
-      description: "Test our file upload capabilities for incorporating images and documents.",
-      link: "/test-uploads",
-      icon: TestFeatureIcon.Uploads,
-      category: "interface"
-    },
-    {
-      title: "Case Creation Workflow",
-      description: "Experience the complete end-to-end case creation workflow.",
-      link: "/dashboard/cases/new",
-      icon: TestFeatureIcon.Workflow,
-      category: "workflow"
-    },
-    {
-      title: "Claude API Test",
-      description: "Test the Claude AI model integration directly.",
-      link: "/test-claude",
+      title: "Claude Integration",
+      description: "Test direct interactions with Claude AI for various use cases.",
       icon: TestFeatureIcon.Claude,
-      category: "api"
+      link: "/test-claude",
+      category: "ai"
+    },
+    {
+      title: "Claude Variants",
+      description: "Test different Claude AI variants and compare their responses.",
+      icon: TestFeatureIcon.Claude,
+      link: "/test-claude-variants",
+      category: "ai"
+    },
+    {
+      title: "Parameters",
+      description: "Test different parameter combinations for case generation.",
+      icon: TestFeatureIcon.Parameters,
+      link: "/test-parameters",
+      category: "interface"
+    },
+    {
+      title: "Local Testing",
+      description: "Test local development features and functionality.",
+      icon: TestFeatureIcon.Local,
+      link: "/test-local",
+      category: "development"
     },
   ];
   

@@ -13,9 +13,5 @@ services:
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
-      - key: UPLOADTHING_SECRET
-        sync: false
-      - key: UPLOADTHING_APP_ID
-        sync: false
     healthCheckPath: /
     autoDeploy: true 

@@ -146,17 +146,8 @@ export default function Home() {
               <div className="p-6">
                 <h3 className="text-xl font-semibold mb-3 text-gray-900">File Uploads</h3>
                 <p className="text-gray-600 mb-4">
-                  Test our file upload capabilities for incorporating images and documents into simulation cases.
+                  File upload functionality is currently under maintenance.
                 </p>
-                <Link
-                  href="/test-uploads"
-                  className="inline-flex items-center text-primary-600 font-medium hover:text-primary-700"
-                >
-                  Try File Uploads
-                  <svg xmlns="http://www.w3.org/2000/svg" className="ml-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </Link>
               </div>
             </div>
           </div>
