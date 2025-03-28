@@ -7,6 +7,9 @@ WORKDIR /app
 # Copy package files
 COPY package.json package-lock.json ./
 
+# Remove postinstall script temporarily
+RUN npm pkg delete scripts.postinstall
+
 # Install dependencies
 RUN npm ci
 
@@ -18,8 +21,7 @@ COPY . .
 
 # Next.js collects completely anonymous telemetry data about general usage.
 # Learn more here: https://nextjs.org/telemetry
-# Uncomment the following line in case you want to disable telemetry during the build.
-# ENV NEXT_TELEMETRY_DISABLED 1
+ENV NEXT_TELEMETRY_DISABLED 1
 
 # Environment variables must be present at build time
 ARG NEXT_PUBLIC_SUPABASE_URL
@@ -36,8 +38,7 @@ FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV production
-# Uncomment the following line in case you want to disable telemetry during runtime.
-# ENV NEXT_TELEMETRY_DISABLED 1
+ENV NEXT_TELEMETRY_DISABLED 1
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
