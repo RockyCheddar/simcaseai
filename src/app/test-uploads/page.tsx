@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { UploadButton, UploadDropzone, type UploadFileResponse } from '@/lib/uploadthing';
+import { OurFileRouter } from '@/app/api/uploadthing/core';
 
 export default function TestUploadsPage() {
   const [uploadedUrls, setUploadedUrls] = useState<string[]>([]);
@@ -25,7 +26,7 @@ export default function TestUploadsPage() {
           </p>
           
           <div className="mb-6">
-            <UploadButton
+            <UploadButton<OurFileRouter, "imageUploader">
               endpoint="imageUploader"
               onClientUploadComplete={(res: UploadFileResponse[] | undefined) => {
                 if (res) {
@@ -68,7 +69,7 @@ export default function TestUploadsPage() {
           </p>
           
           <div className="mb-6">
-            <UploadDropzone
+            <UploadDropzone<OurFileRouter, "documentUploader">
               endpoint="documentUploader"
               onClientUploadComplete={(res: UploadFileResponse[] | undefined) => {
                 if (res) {
