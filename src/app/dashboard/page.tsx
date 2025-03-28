@@ -28,9 +28,46 @@ const mockCases = [
   },
 ];
 
+// Sample data for recent cases - our new sample cases
+const sampleRecentCases = [
+  {
+    id: "case-12345",
+    title: "Acute Respiratory Distress: Management of COPD Exacerbation",
+    status: "complete",
+    updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
+    objectives: [
+      "Identify clinical signs of COPD exacerbation requiring immediate intervention",
+      "Demonstrate appropriate oxygen therapy administration for patients with COPD",
+      "Formulate an evidence-based treatment plan including bronchodilators and corticosteroids"
+    ]
+  },
+  {
+    id: "case-23456",
+    title: "Pediatric Diabetic Ketoacidosis: Assessment and Management",
+    status: "draft",
+    updatedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(), // 10 days ago
+    objectives: [
+      "Recognize the clinical presentation of diabetic ketoacidosis in pediatric patients",
+      "Implement appropriate fluid resuscitation and insulin therapy",
+      "Monitor for and prevent complications of DKA treatment"
+    ]
+  },
+  {
+    id: "case-34567",
+    title: "Postpartum Hemorrhage: Early Recognition and Management",
+    status: "in-review",
+    updatedAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(), // 8 days ago
+    objectives: [
+      "Identify risk factors for postpartum hemorrhage",
+      "Demonstrate appropriate assessment techniques for blood loss estimation",
+      "Implement first-line interventions for postpartum hemorrhage"
+    ]
+  }
+];
+
 export default function Dashboard() {
-  const [recentCases, setRecentCases] = useState(mockCases);
-  const [isLoading, setIsLoading] = useState(true);
+  const [recentCases, setRecentCases] = useState(sampleRecentCases);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     // Simulate API loading delay
@@ -44,11 +81,13 @@ export default function Dashboard() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'published':
-        return <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Published</span>;
+      case 'complete':
+        return <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Complete</span>;
       case 'draft':
         return <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">Draft</span>;
       case 'review':
-        return <span className="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Review</span>;
+      case 'in-review':
+        return <span className="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">In Review</span>;
       default:
         return null;
     }

@@ -8,6 +8,8 @@ import { toast } from 'react-hot-toast';
 import ObjectivesAnalysisStep from './ObjectivesAnalysisStep';
 import ParameterQuestionsStep from './ParameterQuestionsStep';
 import MarkdownPreview from '@/components/MarkdownPreview';
+import AIGenerationLoader from '@/components/AIGenerationLoader';
+import { useRouter } from 'next/navigation';
 
 // Step identifiers for the workflow
 type CreationStep =
@@ -33,10 +35,11 @@ export default function NewCasePage() {
   const [finalObjectives, setFinalObjectives] = useState<LearningObjective[]>([]);
   const [parameterSelections, setParameterSelections] = useState<ParameterSelections>({});
   const [caseParameters, setCaseParameters] = useState<CaseParameters | null>(null);
-  const [generatedCase, setGeneratedCase] = useState<{ text: string; title: string } | null>(null);
+  const [generatedCase, setGeneratedCase] = useState<{ id: string; text: string; title: string } | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [newObjective, setNewObjective] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const router = useRouter();
 
   // Function to handle method selection
   const handleMethodSelect = (method: 'scratch' | 'template' | 'import') => {
@@ -104,7 +107,11 @@ export default function NewCasePage() {
 
     try {
       const result = await generateCase(caseParameters);
-      setGeneratedCase(result);
+      setGeneratedCase({
+        id: `case-${Date.now()}`,
+        text: result.text,
+        title: result.title
+      });
       setCurrentStep('preview');
       toast.success('Case generated successfully!');
     } catch (error) {
@@ -464,19 +471,7 @@ export default function NewCasePage() {
       case 'generating':
         return (
           <div className="max-w-3xl mx-auto">
-            <h2 className="text-xl font-semibold mb-6">Generating Your Simulation Case</h2>
-            <div className="bg-white p-8 rounded-lg shadow-md flex flex-col items-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mb-6"></div>
-              <p className="text-gray-700 mb-2">
-                Creating your simulation case based on the provided parameters...
-              </p>
-              <p className="text-gray-500 text-sm mb-4">
-                This may take a minute or two.
-              </p>
-              <div className="w-full max-w-md bg-gray-200 rounded-full h-2.5 mt-4">
-                <div className="bg-primary-500 h-2.5 rounded-full w-3/4 animate-pulse"></div>
-              </div>
-            </div>
+            <AIGenerationLoader mode="case" />
           </div>
         );
       
@@ -490,6 +485,17 @@ export default function NewCasePage() {
                 <MarkdownPreview 
                   markdown={generatedCase.text} 
                   title={generatedCase.title}
+                  caseData={{
+                    title: generatedCase.title,
+                    content: generatedCase.text,
+                    learningObjectives: caseParameters?.learningObjectives || [],
+                    demographics: caseParameters?.demographics || {},
+                    clinicalContext: caseParameters?.clinicalContext || {},
+                    complexity: caseParameters?.complexity || {},
+                    recommendedVitalSigns: caseParameters?.recommendedVitalSigns || {},
+                    educationalElements: caseParameters?.educationalElements || {},
+                    generatedAt: new Date().toISOString()
+                  }}
                 />
                 
                 <div className="flex justify-between mt-8">
@@ -503,7 +509,8 @@ export default function NewCasePage() {
                     onClick={() => {
                       // Here you would save the case to your database
                       toast.success('Case saved successfully!');
-                      setCurrentStep('complete');
+                      // Redirect to the case detail page with the new case ID
+                      router.push(`/dashboard/cases/${generatedCase?.id || 'new-case-id'}`);
                     }} 
                     className="btn-primary"
                   >

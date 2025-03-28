@@ -2,7 +2,8 @@ import { AIResponse } from '@/lib/api/ai-service';
 
 // Default model to use - using the specified model name
 const DEFAULT_MODEL = 'claude-3-7-sonnet-20250219';
-const TIMEOUT_MS = 20000; // 20 second timeout
+const TIMEOUT_MS = 30000; // Increasing to 30 seconds timeout
+const MAX_RETRIES = 2; // Add retry capability for transient errors
 
 export interface ClaudeOptions {
   prompt: string;
@@ -10,6 +11,7 @@ export interface ClaudeOptions {
   temperature?: number;
   max_tokens?: number;
   system?: string;
+  retryCount?: number; // Track retries internally
 }
 
 /**
@@ -21,7 +23,8 @@ export async function callClaude(options: ClaudeOptions): Promise<AIResponse> {
     model = DEFAULT_MODEL, // This is kept for backwards compatibility
     temperature = 0.7,
     max_tokens = 4000,
-    system = "You are a medical education expert specializing in healthcare simulation cases."
+    system = "You are a medical education expert specializing in healthcare simulation cases.",
+    retryCount = 0 // Initial retry count is 0
   } = options;
 
   const API_KEY = process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY;
@@ -34,7 +37,7 @@ export async function callClaude(options: ClaudeOptions): Promise<AIResponse> {
     console.error('Invalid Claude API key format. Should start with sk-ant-');
   }
 
-  console.log("Calling Claude API with model:", DEFAULT_MODEL);
+  console.log(`Calling Claude API with model: ${DEFAULT_MODEL}${retryCount > 0 ? ` (retry ${retryCount}/${MAX_RETRIES})` : ''}`);
   
   // Create an AbortController to handle timeout
   const controller = new AbortController();
@@ -63,12 +66,35 @@ export async function callClaude(options: ClaudeOptions): Promise<AIResponse> {
     if (!response.ok) {
       const errorText = await response.text();
       console.error("Claude API error response:", errorText);
+      
+      // Parse the error response
+      let errorMessage: string;
+      let isTimeout = false;
+      
       try {
         const errorData = JSON.parse(errorText);
-        throw new Error(`Claude API error: ${errorData.error || response.statusText}`);
+        errorMessage = errorData.error || response.statusText;
+        isTimeout = errorData.isTimeout === true;
       } catch (e) {
-        throw new Error(`Claude API error: ${response.status} ${response.statusText}`);
+        errorMessage = `${response.status} ${response.statusText}`;
+        isTimeout = response.status === 504;
       }
+      
+      // Check if we should retry
+      if ((isTimeout || response.status >= 500) && retryCount < MAX_RETRIES) {
+        console.log(`Retrying Claude API call (${retryCount + 1}/${MAX_RETRIES})...`);
+        // Exponential backoff delay
+        const delay = Math.pow(2, retryCount) * 1000;
+        await new Promise(resolve => setTimeout(resolve, delay));
+        
+        // Retry with incremented retry count
+        return callClaude({
+          ...options,
+          retryCount: retryCount + 1
+        });
+      }
+      
+      throw new Error(`Claude API error: ${errorMessage}`);
     }
 
     const data = await response.json();
@@ -90,7 +116,22 @@ export async function callClaude(options: ClaudeOptions): Promise<AIResponse> {
     
     if (error.name === 'AbortError') {
       console.error('Claude API request timed out after', TIMEOUT_MS/1000, 'seconds');
-      throw new Error(`Claude API request timed out after ${TIMEOUT_MS/1000} seconds`);
+      
+      // Check if we should retry
+      if (retryCount < MAX_RETRIES) {
+        console.log(`Retrying Claude API call after timeout (${retryCount + 1}/${MAX_RETRIES})...`);
+        // Exponential backoff delay
+        const delay = Math.pow(2, retryCount) * 1000;
+        await new Promise(resolve => setTimeout(resolve, delay));
+        
+        // Retry with incremented retry count
+        return callClaude({
+          ...options,
+          retryCount: retryCount + 1
+        });
+      }
+      
+      throw new Error(`Claude API request timed out after ${TIMEOUT_MS/1000} seconds. Please try again later.`);
     }
     
     console.error('Error calling Claude API:', error);

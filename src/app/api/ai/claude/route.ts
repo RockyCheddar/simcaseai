@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 
+// Add a constant for timeout duration (in milliseconds)
+const API_TIMEOUT = 30000; // 30 seconds
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -15,9 +18,10 @@ export async function POST(req: Request) {
       );
     }
     
-    // Initialize the Anthropic client
+    // Initialize the Anthropic client with a timeout option
     const anthropic = new Anthropic({
       apiKey: API_KEY,
+      timeout: API_TIMEOUT, // Add timeout to the client
     });
     
     // Use the specific model name provided
@@ -25,18 +29,30 @@ export async function POST(req: Request) {
     
     console.log('Server-side Claude API call with model:', modelToUse);
     
-    // Call Claude API with the correct SDK approach
-    const message = await anthropic.messages.create({
-      model: modelToUse,
-      max_tokens: max_tokens || 4000,
-      temperature: temperature || 0.7,
-      system: system || "You are a medical education expert specializing in healthcare simulation cases.",
-      messages: [
-        { role: "user", content: prompt }
-      ]
+    // Create a timeout promise to race against the API call
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(`Claude API call timed out after ${API_TIMEOUT}ms`)), API_TIMEOUT);
     });
     
+    // Race the API call against the timeout
+    const message = await Promise.race([
+      anthropic.messages.create({
+        model: modelToUse,
+        max_tokens: max_tokens || 4000,
+        temperature: temperature || 0.7,
+        system: system || "You are a medical education expert specializing in healthcare simulation cases.",
+        messages: [
+          { role: "user", content: prompt }
+        ]
+      }),
+      timeoutPromise
+    ]) as Anthropic.Messages.Message;
+    
     // Check if content is available and is of type 'text'
+    if (!message || !message.content || message.content.length === 0) {
+      throw new Error("Invalid or empty response from Claude API");
+    }
+    
     const responseText = message.content[0].type === 'text' 
       ? message.content[0].text 
       : 'Response received but no text content available';
@@ -49,9 +65,16 @@ export async function POST(req: Request) {
   } catch (error: any) {
     console.error('Claude API error:', error.message || error);
     
+    // Check for timeout error specifically
+    const errorMessage = error.message || String(error);
+    const isTimeout = errorMessage.includes('timed out');
+    
     return NextResponse.json(
-      { error: `Claude API error: ${error.message || error}` },
-      { status: 500 }
+      { 
+        error: `Claude API error: ${errorMessage}`,
+        isTimeout: isTimeout
+      },
+      { status: isTimeout ? 504 : 500 } // Use 504 Gateway Timeout for timeouts
     );
   }
 } 

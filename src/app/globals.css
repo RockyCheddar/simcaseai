@@ -27,6 +27,17 @@
     @apply btn bg-white border-gray-300 text-gray-700 hover:bg-gray-50;
   }
 
+  /* Animation for AI generator loader */
+  .animate-fade-in-out {
+    animation: fadeInOut 3s ease-in-out infinite;
+  }
+
+  @keyframes fadeInOut {
+    0% { opacity: 0.4; }
+    50% { opacity: 1; }
+    100% { opacity: 0.4; }
+  }
+
   /* Add markdown styling */
   .prose {
     @apply text-gray-800 leading-normal;

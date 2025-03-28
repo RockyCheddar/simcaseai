@@ -9,9 +9,48 @@ import { visit } from 'unist-util-visit';
 // This avoids the VFS import issues
 if (typeof window !== 'undefined') {
   // Client-side only
-  import('pdfmake/build/vfs_fonts').then((vfs) => {
-    (pdfMake as any).vfs = vfs.pdfMake.vfs;
-  });
+  try {
+    const loadFonts = async () => {
+      try {
+        // Try to load the fonts dynamically
+        const vfsModule = await import('pdfmake/build/vfs_fonts');
+        
+        // Access vfs directly since the structure may vary based on the module implementation
+        if (vfsModule && typeof vfsModule === 'object') {
+          // Check for the pdfMake property in the module
+          if ('pdfMake' in vfsModule && 
+              vfsModule.pdfMake && 
+              typeof vfsModule.pdfMake === 'object' && 
+              'vfs' in vfsModule.pdfMake) {
+            // Standard structure
+            (pdfMake as any).vfs = vfsModule.pdfMake.vfs;
+          } else if ('vfs' in vfsModule) {
+            // Alternative structure
+            (pdfMake as any).vfs = vfsModule.vfs;
+          } else {
+            // If neither expected structure is found
+            console.warn('PDF fonts module loaded but vfs not found in expected structure. Using fallback.');
+            (pdfMake as any).vfs = (pdfMake as any).vfs || {};
+          }
+          console.log('PDF fonts loaded');
+        } else {
+          console.warn('PDF fonts module loaded but not an object. Using fallback.');
+          (pdfMake as any).vfs = (pdfMake as any).vfs || {};
+        }
+      } catch (error) {
+        console.error('Error loading PDF fonts:', error);
+        // Ensure pdfMake.vfs exists even if the import fails
+        (pdfMake as any).vfs = (pdfMake as any).vfs || {};
+      }
+    };
+    
+    // Execute the font loading
+    loadFonts();
+  } catch (error) {
+    console.error('Critical error setting up PDF fonts:', error);
+    // Last resort fallback
+    (pdfMake as any).vfs = {};
+  }
 }
 
 // Define document styles
