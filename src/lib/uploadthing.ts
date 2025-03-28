@@ -9,7 +9,7 @@ export {
   UploadButton,
   UploadDropzone,
   Uploader
-} from "uploadthing/react";
+} from "@uploadthing/react";
 
 // Types for responses
 export type UploadFileResponse = {
