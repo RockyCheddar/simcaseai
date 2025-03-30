@@ -18,7 +18,16 @@ export interface AIOptions {
   maxTokens?: number;
   system?: string;
   testMode?: boolean;
+  retryCount?: number;
+  timeout?: number;
+  totalAttempts?: number;
 }
+
+// Constants for timeouts and retries
+export const DEFAULT_TIMEOUT = 60000;  // 60 seconds default timeout
+export const MAX_RETRIES = 2;  // Maximum 2 retries
+export const MAX_TOTAL_ATTEMPTS = 3;  // Absolute maximum number of attempts regardless of provider
+export const RETRY_DELAY_BASE = 2000;  // Base delay of 2 seconds for exponential backoff
 
 // Utility to select the optimal AI provider based on the task
 export function selectOptimalProvider(task: string): AIProvider {
@@ -51,10 +60,22 @@ export async function generateAIResponse(options: AIOptions): Promise<AIResponse
     temperature = 0.7, 
     maxTokens = 4000,
     system,
-    testMode = false
+    testMode = false,
+    retryCount = 0,
+    timeout = DEFAULT_TIMEOUT,
+    totalAttempts = 1  // Track total attempts across all providers
   } = options;
   
-  console.log(`Using AI provider: ${provider}`);
+  // Hard stop if we've exceeded the total attempt limit
+  if (totalAttempts > MAX_TOTAL_ATTEMPTS) {
+    throw new Error(`Maximum total attempts (${MAX_TOTAL_ATTEMPTS}) exceeded. All AI providers failed.`);
+  }
+  
+  if (retryCount > MAX_RETRIES) {
+    throw new Error(`Maximum retry attempts (${MAX_RETRIES}) exceeded. All AI providers failed.`);
+  }
+  
+  console.log(`Using AI provider: ${provider} (Attempt ${totalAttempts}/${MAX_TOTAL_ATTEMPTS})`);
   
   // If test mode is enabled, return mock response immediately
   if (testMode) {
@@ -62,72 +83,108 @@ export async function generateAIResponse(options: AIOptions): Promise<AIResponse
   }
   
   try {
-    // Call the appropriate provider API
-    switch (provider) {
-      case 'claude':
-        return await callClaude({
-          prompt,
-          temperature,
-          max_tokens: maxTokens,
-          system
-        });
-      
-      case 'chatgpt':
-        return await callChatGPT({
-          prompt,
-          temperature,
-          max_tokens: maxTokens,
-          system
-        });
-      
-      case 'perplexity':
-        return await callPerplexity({
-          prompt,
-          temperature,
-          max_tokens: maxTokens,
-          system
-        });
-      
-      case 'test':
-        return getTestResponse(prompt, 'test');
+    // Create a timeout promise
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(`Request timed out after ${timeout/1000} seconds`));
+      }, timeout);
+    });
+
+    // Call the appropriate provider API with timeout race
+    const apiCallPromise = (async () => {
+      switch (provider) {
+        case 'claude':
+          return await callClaude({
+            prompt,
+            temperature,
+            max_tokens: maxTokens,
+            system,
+            timeout
+          });
         
-      default:
-        // If provider is not recognized, use Claude as fallback
-        console.log(`Unknown provider ${provider}, falling back to Claude`);
-        return await callClaude({
-          prompt,
-          temperature,
-          max_tokens: maxTokens,
-          system
-        });
-    }
-  } catch (error) {
-    console.error(`Error generating AI response with ${provider}:`, error);
+        case 'chatgpt':
+          return await callChatGPT({
+            prompt,
+            temperature,
+            max_tokens: maxTokens,
+            system,
+            timeout
+          });
+        
+        case 'perplexity':
+          return await callPerplexity({
+            prompt,
+            temperature,
+            max_tokens: maxTokens,
+            system,
+            timeout
+          });
+        
+        case 'test':
+          return getTestResponse(prompt, 'test');
+          
+        default:
+          console.log(`Unknown provider ${provider}, falling back to Claude`);
+          return await callClaude({
+            prompt,
+            temperature,
+            max_tokens: maxTokens,
+            system,
+            timeout
+          });
+      }
+    })();
+
+    // Race between the API call and timeout
+    return await Promise.race([apiCallPromise, timeoutPromise]);
+
+  } catch (error: any) {
+    const errorMessage = error.message || String(error);
+    const isTimeout = errorMessage.includes('timed out') || error.name === 'AbortError';
     
-    // Don't try to fallback to ChatGPT if we don't have the key
+    console.error(`Error generating AI response with ${provider}:`, {
+      error: errorMessage,
+      isTimeout,
+      retryCount,
+      totalAttempts
+    });
+    
+    // Don't retry on ChatGPT errors
     if (provider === 'chatgpt') {
       throw error;
     }
     
-    // If Claude fails, try Perplexity
-    if (provider === 'claude') {
-      console.log('Falling back to Perplexity after Claude failure');
-      return generateAIResponse({
-        ...options,
-        provider: 'perplexity'
-      });
+    // If we haven't exceeded retries, try the alternate provider with exponential backoff
+    if (retryCount < MAX_RETRIES && totalAttempts < MAX_TOTAL_ATTEMPTS) {
+      const delay = RETRY_DELAY_BASE * Math.pow(2, retryCount);
+      console.log(`Waiting ${delay/1000} seconds before retry...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      
+      // Switch between Claude and Perplexity
+      const nextProvider = provider === 'claude' ? 'perplexity' : 'claude';
+      console.log(`Retrying with ${nextProvider}...`);
+      
+      try {
+        return await generateAIResponse({
+          ...options,
+          provider: nextProvider,
+          retryCount: retryCount + 1,
+          timeout: timeout * 1.5,  // Increase timeout for retries
+          totalAttempts: totalAttempts + 1  // Increment total attempts
+        });
+      } catch (retryError: any) {
+        // When retry fails, add a fallback error message
+        if (totalAttempts >= MAX_TOTAL_ATTEMPTS - 1) {
+          // This was our last attempt, throw a final error
+          throw new Error(`All AI providers failed after ${MAX_TOTAL_ATTEMPTS} attempts. Please try again later.`);
+        } else {
+          throw retryError; // Pass through the error
+        }
+      }
     }
     
-    // If Perplexity fails, try Claude
-    if (provider === 'perplexity') {
-      console.log('Falling back to Claude after Perplexity failure');
-      return generateAIResponse({
-        ...options,
-        provider: 'claude'
-      });
-    }
-    
-    throw error;
+    // If we've exhausted retries, throw a final error
+    throw new Error(`All AI providers failed after ${totalAttempts} attempts. Last error: ${errorMessage}`);
   }
 }
 
@@ -692,35 +749,27 @@ export async function generateCase(caseParameters: any): Promise<{ text: string;
     Make sure the case is realistic and reflects the complexity level specified in the parameters.
   `;
   
-  // Add a timeout promise
-  const timeout = new Promise<{ text: string; title: string }>((_, reject) => {
-    setTimeout(() => {
-      reject(new Error('Request timed out after 60 seconds'));
-    }, 60000); // 60 second timeout for case generation
-  });
-  
   try {
-    // Use Promise.race to race the API call against the timeout
-    const apiCallPromise = generateAIResponse({
+    // Use generateAIResponse with totalAttempts parameter
+    const response = await generateAIResponse({
       prompt,
       provider: 'claude', // Explicitly use Claude for this complex task
       system: "You are an expert in healthcare simulation design with years of experience creating realistic, educationally sound simulation scenarios for healthcare education.",
-      maxTokens: 4000 // Ensure we have enough tokens for a comprehensive response
-    }).then(response => {
-      // Extract a title from the response (assuming the first line is the title or contains the title)
-      const titleMatch = response.text.match(/# (.+)|## Case Title\s*\n+(.+)/m);
-      const title = titleMatch 
-        ? (titleMatch[1] || titleMatch[2]).trim() 
-        : "Healthcare Simulation Case";
-      
-      return {
-        text: response.text,
-        title: title
-      };
+      maxTokens: 4000, // Ensure we have enough tokens for a comprehensive response
+      timeout: 60000, // 60 second timeout
+      totalAttempts: 1 // Start with first attempt
     });
     
-    // Race the API call against the timeout
-    return await Promise.race([apiCallPromise, timeout]);
+    // Extract a title from the response
+    const titleMatch = response.text.match(/# (.+)|## Case Title\s*\n+(.+)/m);
+    const title = titleMatch 
+      ? (titleMatch[1] || titleMatch[2]).trim() 
+      : "Healthcare Simulation Case";
+    
+    return {
+      text: response.text,
+      title: title
+    };
   } catch (error) {
     console.error('Error generating case:', error);
     
@@ -806,4 +855,4 @@ ${caseParameters.learningObjectives.map((obj: any, i: number) => `${i + 1}. ${ob
     text: caseText,
     title: title
   };
-} 
+}
