@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LearningObjective } from '@/types/case';
 import { analyzeObjectives } from '@/lib/api/ai-service';
 import AIAnalysisDisplay from '@/components/ai/AIAnalysisDisplay';
-import { AIResponse } from '@/lib/api/ai-service';
+import { AIResponse } from '@/lib/api/interfaces';
 import { toast } from 'react-hot-toast';
 
 interface ObjectivesAnalysisStepProps {
