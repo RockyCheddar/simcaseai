@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
+import { logger } from '@/utils/logger';
 
 // Add a constant for timeout duration (in milliseconds)
 const API_TIMEOUT = 30000; // 30 seconds
@@ -10,10 +11,12 @@ export async function POST(req: Request) {
     const { prompt, temperature, max_tokens, system } = body;
     
     // Get API key from environment variable
-    const API_KEY = process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY;
+    const API_KEY = process.env.ANTHROPIC_API_KEY;
     if (!API_KEY) {
+      const error = new Error('Claude API key is missing');
+      logger.error('Claude API key missing', error);
       return NextResponse.json(
-        { error: 'Claude API key is missing' },
+        { error: error.message },
         { status: 500 }
       );
     }
@@ -21,13 +24,17 @@ export async function POST(req: Request) {
     // Initialize the Anthropic client with a timeout option
     const anthropic = new Anthropic({
       apiKey: API_KEY,
-      timeout: API_TIMEOUT, // Add timeout to the client
+      timeout: API_TIMEOUT,
     });
     
     // Use the specific model name provided
     const modelToUse = "claude-3-7-sonnet-20250219";
     
-    console.log('Server-side Claude API call with model:', modelToUse);
+    logger.info('Server-side Claude API call initiated', {
+      model: modelToUse,
+      maxTokens: max_tokens,
+      temperature
+    });
     
     // Create a timeout promise to race against the API call
     const timeoutPromise = new Promise((_, reject) => {
@@ -57,24 +64,45 @@ export async function POST(req: Request) {
       ? message.content[0].text 
       : 'Response received but no text content available';
     
+    logger.info('Claude API call successful', {
+      contentLength: responseText.length,
+      messageId: message.id
+    });
+    
     // Return the response
     return NextResponse.json({
       content: [{ text: responseText }]
     });
     
   } catch (error: any) {
-    console.error('Claude API error:', error.message || error);
+    // Check for specific error types
+    const isTimeout = error.message?.includes('timed out') || error.name === 'AbortError';
+    const isRateLimit = error.status === 429;
+    const isServerError = error.status >= 500;
     
-    // Check for timeout error specifically
-    const errorMessage = error.message || String(error);
-    const isTimeout = errorMessage.includes('timed out');
+    // Log the error with context
+    logger.error('Claude API error', error, {
+      isTimeout,
+      isRateLimit,
+      isServerError,
+      status: error.status,
+      name: error.name
+    });
     
+    // Return appropriate error response
     return NextResponse.json(
       { 
-        error: `Claude API error: ${errorMessage}`,
-        isTimeout: isTimeout
+        error: error.message || 'An error occurred while calling Claude API',
+        isTimeout,
+        isRateLimit,
+        isServerError
       },
-      { status: isTimeout ? 504 : 500 } // Use 504 Gateway Timeout for timeouts
+      { 
+        status: isTimeout ? 504 : 
+                isRateLimit ? 429 :
+                isServerError ? 502 :
+                500
+      }
     );
   }
 } 
