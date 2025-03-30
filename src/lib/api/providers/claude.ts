@@ -19,7 +19,7 @@ export async function callClaude(options: ClaudeOptions): Promise<AIResponse> {
     timeout = TIMEOUT_MS
   } = options;
 
-  const API_KEY = process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY;
+  const API_KEY = process.env.ANTHROPIC_API_KEY;
   if (!API_KEY) {
     throw new Error('Claude API key is missing');
   }

@@ -16,7 +16,7 @@ export async function callPerplexity(options: PerplexityOptions): Promise<AIResp
     system = "You are a medical education expert specializing in healthcare simulation cases. Provide comprehensive, well-researched answers with citations where appropriate."
   } = options;
 
-  const API_KEY = process.env.NEXT_PUBLIC_PERPLEXITY_API_KEY;
+  const API_KEY = process.env.PERPLEXITY_API_KEY;
   if (!API_KEY) {
     throw new Error('Perplexity API key is missing');
   }
