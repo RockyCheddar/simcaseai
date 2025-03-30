@@ -1,18 +1,9 @@
-import { AIResponse } from '@/lib/api/ai-service';
+import { AIResponse, ClaudeOptions } from '@/lib/api/interfaces';
 
 // Default model to use - using the specified model name
 const DEFAULT_MODEL = 'claude-3-7-sonnet-20250219';
 const TIMEOUT_MS = 30000; // Increasing to 30 seconds timeout
 const MAX_RETRIES = 2; // Add retry capability for transient errors
-
-export interface ClaudeOptions {
-  prompt: string;
-  model?: string; // We'll keep this for backwards compatibility
-  temperature?: number;
-  max_tokens?: number;
-  system?: string;
-  retryCount?: number; // Track retries internally
-}
 
 /**
  * Calls the Claude API with the provided options
@@ -24,7 +15,8 @@ export async function callClaude(options: ClaudeOptions): Promise<AIResponse> {
     temperature = 0.7,
     max_tokens = 4000,
     system = "You are a medical education expert specializing in healthcare simulation cases.",
-    retryCount = 0 // Initial retry count is 0
+    retryCount = 0, // Initial retry count is 0
+    timeout = TIMEOUT_MS
   } = options;
 
   const API_KEY = process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY;
@@ -41,7 +33,7 @@ export async function callClaude(options: ClaudeOptions): Promise<AIResponse> {
   
   // Create an AbortController to handle timeout
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   try {
     // Use the server-side API route instead of calling Anthropic directly
@@ -115,7 +107,7 @@ export async function callClaude(options: ClaudeOptions): Promise<AIResponse> {
     clearTimeout(timeoutId);
     
     if (error.name === 'AbortError') {
-      console.error('Claude API request timed out after', TIMEOUT_MS/1000, 'seconds');
+      console.error('Claude API request timed out after', timeout/1000, 'seconds');
       
       // Check if we should retry
       if (retryCount < MAX_RETRIES) {
@@ -131,7 +123,7 @@ export async function callClaude(options: ClaudeOptions): Promise<AIResponse> {
         });
       }
       
-      throw new Error(`Claude API request timed out after ${TIMEOUT_MS/1000} seconds. Please try again later.`);
+      throw new Error(`Claude API request timed out after ${timeout/1000} seconds. Please try again later.`);
     }
     
     console.error('Error calling Claude API:', error);

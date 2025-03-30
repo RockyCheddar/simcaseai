@@ -1,27 +1,11 @@
 import { callClaude } from './providers/claude';
 import { callChatGPT } from './providers/chatgpt';
 import { callPerplexity } from './providers/perplexity';
-
-export type AIProvider = 'claude' | 'chatgpt' | 'perplexity' | 'test';
-
-export interface AIResponse {
-  text: string;
-  provider: AIProvider;
-  timestamp: string;
-  modelUsed?: string;
-}
-
-export interface AIOptions {
-  prompt: string;
-  provider?: AIProvider;
-  temperature?: number;
-  maxTokens?: number;
-  system?: string;
-  testMode?: boolean;
-  retryCount?: number;
-  timeout?: number;
-  totalAttempts?: number;
-}
+import { 
+  AIProvider, 
+  AIResponse, 
+  AIOptions
+} from './interfaces';
 
 // Constants for timeouts and retries
 export const DEFAULT_TIMEOUT = 60000;  // 60 seconds default timeout

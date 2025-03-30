@@ -1,15 +1,7 @@
-import { AIResponse } from '@/lib/api/ai-service';
+import { AIResponse, ChatGPTOptions } from '@/lib/api/interfaces';
 
 // Default model to use
 const DEFAULT_MODEL = 'gpt-4-turbo';
-
-export interface ChatGPTOptions {
-  prompt: string;
-  model?: string;
-  temperature?: number;
-  max_tokens?: number;
-  system?: string;
-}
 
 /**
  * Calls the OpenAI API with the provided options

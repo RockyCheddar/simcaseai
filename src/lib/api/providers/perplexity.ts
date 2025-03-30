@@ -1,16 +1,8 @@
-import { AIResponse } from '@/lib/api/ai-service';
+import { AIResponse, PerplexityOptions } from '@/lib/api/interfaces';
 
 // Default model to use
 const DEFAULT_MODEL = 'sonar-deep-research';
 const TIMEOUT_MS = 20000; // 20 second timeout for deep research
-
-export interface PerplexityOptions {
-  prompt: string;
-  model?: string;
-  temperature?: number;
-  max_tokens?: number;
-  system?: string;
-}
 
 /**
  * Calls the Perplexity API with the provided options
