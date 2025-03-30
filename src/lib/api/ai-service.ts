@@ -99,6 +99,7 @@ export async function generateAIResponse(options: AIOptions): Promise<AIResponse
             temperature,
             max_tokens: maxTokens,
             system,
+            retryCount,
             timeout
           });
         
@@ -130,6 +131,7 @@ export async function generateAIResponse(options: AIOptions): Promise<AIResponse
             temperature,
             max_tokens: maxTokens,
             system,
+            retryCount,
             timeout
           });
       }
