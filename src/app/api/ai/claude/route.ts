@@ -11,7 +11,7 @@ export async function POST(req: Request) {
     const { prompt, temperature, max_tokens, system } = body;
     
     // Get API key from environment variable
-    const API_KEY = process.env.ANTHROPIC_API_KEY;
+    const API_KEY = process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY;
     if (!API_KEY) {
       const error = new Error('Claude API key is missing');
       logger.error('Claude API key missing', error);
