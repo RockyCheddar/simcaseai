@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { generateAIResponse, AIResponse } from '@/lib/api/ai-service';
-import AIAnalysisDisplay from './AIAnalysisDisplay';
 import { toast } from 'react-hot-toast';
+import { generateAIResponse } from '@/lib/api/ai-service';
+import { AIResponse } from '@/lib/api/interfaces';
+import AIAnalysisDisplay from './AIAnalysisDisplay';
 
 export default function AITestComponent() {
   const [prompt, setPrompt] = useState('');
