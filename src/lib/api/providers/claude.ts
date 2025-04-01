@@ -92,6 +92,7 @@ export async function callClaude(options: ClaudeOptions): Promise<AIResponse> {
       if (!response.ok) {
         const errorText = await response.text();
         console.error("Claude API error response:", errorText);
+        console.error("Claude API error status:", response.status, response.statusText);
         
         // Parse the error response
         let errorMessage: string;
@@ -101,9 +102,24 @@ export async function callClaude(options: ClaudeOptions): Promise<AIResponse> {
           const errorData = JSON.parse(errorText);
           errorMessage = errorData.error || response.statusText;
           isTimeout = errorData.isTimeout === true;
+          
+          // Check explicitly for authentication issues
+          const isAuthError = errorData.isAuthError === true || 
+                             response.status === 401 || 
+                             response.status === 403 ||
+                             errorMessage.includes('invalid') && errorMessage.includes('key');
+                             
+          if (isAuthError) {
+            console.error("⚠️ Authentication error detected with Claude API. Please check your API key.");
+            errorMessage = "Authentication error with Claude API. Please check your API key is valid and correctly configured.";
+          }
+          
+          // Log more details about the error
+          console.error("Claude API error details:", JSON.stringify(errorData, null, 2));
         } catch (e) {
           errorMessage = `${response.status} ${response.statusText}`;
           isTimeout = response.status === 504;
+          console.error("Failed to parse error response:", e);
         }
         
         // Check if we should retry
