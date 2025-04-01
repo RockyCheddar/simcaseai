@@ -10,6 +10,8 @@ import MarkdownPreview from '@/components/MarkdownPreview';
 import AIGenerationLoader from '@/components/AIGenerationLoader';
 import { useRouter } from 'next/navigation';
 import useAICase from '@/hooks/useAICase';
+import { Tab } from '@headlessui/react';
+import CaseTabs from '@/components/CaseTabs';
 
 // Step identifiers for the workflow
 type CreationStep =
@@ -485,21 +487,135 @@ export default function NewCasePage() {
             
             {generatedCase ? (
               <div className="mb-6">
-                <MarkdownPreview 
-                  markdown={generatedCase.text} 
-                  title={generatedCase.title}
-                  caseData={{
-                    title: generatedCase.title,
-                    content: generatedCase.text,
-                    learningObjectives: caseParameters?.learningObjectives || [],
-                    demographics: caseParameters?.demographics || {},
-                    clinicalContext: caseParameters?.clinicalContext || {},
-                    complexity: caseParameters?.complexity || {},
-                    recommendedVitalSigns: caseParameters?.recommendedVitalSigns || {},
-                    educationalElements: caseParameters?.educationalElements || {},
-                    generatedAt: new Date().toISOString()
-                  }}
-                />
+                <Tab.Group>
+                  <CaseTabs tabs={[
+                    { name: 'Overview', current: true },
+                    { name: 'Patient Info', current: false },
+                    { name: 'Presentation', current: false },
+                    { name: 'Treatment', current: false },
+                    { name: 'Simulation Learning', current: false },
+                  ]}>
+                    {/* Overview Tab */}
+                    <Tab.Panel>
+                      <div className="bg-white p-6 rounded-lg shadow">
+                        <div className="flex items-center justify-between">
+                          <h2 className="text-lg font-medium">Overview</h2>
+                        </div>
+                        <div className="mt-4 prose max-w-none">
+                          <MarkdownPreview markdown={generatedCase.text} title={generatedCase.title} />
+                        </div>
+                      </div>
+                    </Tab.Panel>
+                    
+                    {/* Patient Info Tab */}
+                    <Tab.Panel>
+                      <div className="bg-white p-6 rounded-lg shadow">
+                        <div className="flex items-center justify-between">
+                          <h2 className="text-lg font-medium">Patient Info</h2>
+                        </div>
+                        <div className="mt-4">
+                          {caseParameters?.demographics && (
+                            <div className="space-y-4">
+                              <h3 className="text-md font-medium text-gray-900">Demographics</h3>
+                              <div className="grid grid-cols-2 gap-4">
+                                {Object.entries(caseParameters.demographics).map(([key, value]) => (
+                                  <div key={key} className="mb-2">
+                                    <span className="text-sm font-medium text-gray-500">{key}:</span>
+                                    <p className="text-gray-800">{typeof value === 'string' ? value : Array.isArray(value) ? value.join(', ') : JSON.stringify(value)}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </Tab.Panel>
+                    
+                    {/* Presentation Tab */}
+                    <Tab.Panel>
+                      <div className="space-y-6">
+                        <div className="bg-white p-6 rounded-lg shadow">
+                          <div className="flex items-center justify-between">
+                            <h2 className="text-lg font-medium">Vital Signs</h2>
+                          </div>
+                          <div className="mt-4">
+                            {caseParameters?.recommendedVitalSigns && (
+                              <div className="grid grid-cols-2 gap-4">
+                                {Object.entries(caseParameters.recommendedVitalSigns).map(([key, value]) => (
+                                  <div key={key}>
+                                    <span className="text-sm font-medium text-gray-500">{key}:</span>
+                                    <p className="text-gray-800">
+                                      {typeof value === 'object' && 'min' in value && 'max' in value
+                                        ? `${value.min}-${value.max}`
+                                        : String(value)}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="bg-white p-6 rounded-lg shadow">
+                          <div className="flex items-center">
+                            <h2 className="text-lg font-medium">Physical Examination</h2>
+                          </div>
+                          <div className="mt-4">
+                            {caseParameters?.complexity?.abnormalFindings && (
+                              <div className="space-y-2">
+                                {caseParameters.complexity.abnormalFindings.map((finding: string, index: number) => (
+                                  <p key={index}>{finding}</p>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </Tab.Panel>
+                    
+                    {/* Treatment Tab */}
+                    <Tab.Panel>
+                      <div className="bg-white p-6 rounded-lg shadow">
+                        <div className="flex items-center justify-between">
+                          <h2 className="text-lg font-medium">Treatment</h2>
+                        </div>
+                        <div className="mt-4">
+                          {caseParameters?.clinicalContext?.availableResources && (
+                            <div className="space-y-4">
+                              <h3 className="text-md font-medium text-gray-900">Available Resources</h3>
+                              <ul className="list-disc pl-5">
+                                {caseParameters.clinicalContext.availableResources.map((resource: string, index: number) => (
+                                  <li key={index}>{resource}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </Tab.Panel>
+                    
+                    {/* Simulation Learning Tab */}
+                    <Tab.Panel>
+                      <div className="bg-white p-6 rounded-lg shadow">
+                        <div className="flex items-center justify-between">
+                          <h2 className="text-lg font-medium">Simulation Learning</h2>
+                        </div>
+                        <div className="mt-4">
+                          {caseParameters?.learningObjectives && (
+                            <div className="space-y-4">
+                              <h3 className="text-md font-medium text-gray-900">Learning Objectives</h3>
+                              <ul className="list-disc pl-5">
+                                {caseParameters.learningObjectives.map((objective: any, index: number) => (
+                                  <li key={index}>{objective.text}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </Tab.Panel>
+                  </CaseTabs>
+                </Tab.Group>
                 
                 <div className="flex justify-between mt-8">
                   <button 
@@ -510,10 +626,33 @@ export default function NewCasePage() {
                   </button>
                   <button 
                     onClick={() => {
-                      // Here you would save the case to your database
-                      toast.success('Case saved successfully!');
-                      // Redirect to the case detail page with the new case ID
-                      router.push(`/dashboard/cases/${generatedCase?.id || 'new-case-id'}`);
+                      try {
+                        // Create a full case data object
+                        const fullCaseData = {
+                          id: generatedCase.id,
+                          title: generatedCase.title,
+                          text: generatedCase.text,
+                          status: "complete",
+                          createdAt: new Date().toISOString(),
+                          updatedAt: new Date().toISOString(),
+                          demographics: caseParameters?.demographics || {},
+                          clinicalContext: caseParameters?.clinicalContext || {},
+                          complexity: caseParameters?.complexity || {},
+                          recommendedVitalSigns: caseParameters?.recommendedVitalSigns || {},
+                          learningObjectives: caseParameters?.learningObjectives || [],
+                          educationalElements: caseParameters?.educationalElements || {}
+                        };
+                        
+                        // Save to localStorage
+                        localStorage.setItem(`case-${generatedCase.id}`, JSON.stringify(fullCaseData));
+                        toast.success('Case saved successfully!');
+                        
+                        // Redirect to the case detail page with the new case ID
+                        router.push(`/dashboard/cases/${generatedCase.id}`);
+                      } catch (error) {
+                        console.error('Error saving case:', error);
+                        toast.error('Failed to save case. Please try again.');
+                      }
                     }} 
                     className="btn-primary"
                   >

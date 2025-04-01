@@ -82,7 +82,7 @@ export function useAICase() {
            - List the learning objectives
         
         3. ## Patient Information
-           - Name (fictional)
+           - Name (fictional): Create a realistic fictional full name (first and last name) appropriate for the demographics
            - Age, gender, occupation
            - Chief complaint
            - Brief history of present illness
@@ -194,7 +194,7 @@ export function useAICase() {
   ${caseParameters.learningObjectives.map((obj: any, i: number) => `${i + 1}. ${obj.text}`).join('\n')}
   
   ## Patient Information
-  - Name: [Fictional Patient Name]
+  - Name: Sarah Johnson
   - Age: ${caseParameters.demographics?.ageRange || "Adult"}
   - Gender: ${caseParameters.demographics?.gender || "Not specified"}
   ${caseParameters.demographics?.occupation ? `- Occupation: ${caseParameters.demographics.occupation}` : ''}
