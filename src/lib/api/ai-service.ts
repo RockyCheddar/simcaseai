@@ -15,14 +15,17 @@ export const RETRY_DELAY_BASE = 2000;  // Base delay of 2 seconds for exponentia
 
 // Utility to select the optimal AI provider based on the task
 export function selectOptimalProvider(task: string): AIProvider {
-  // Logic to determine which AI model is best for this task
-  if (task.includes('complex medical') || task.includes('clinical accuracy')) {
-    return 'claude'; // Claude may be better for complex medical content
-  } else if (task.includes('fact check') || task.includes('research')) {
-    return 'perplexity'; // Perplexity is good for research tasks
-  } else {
-    return 'claude'; // Default to Claude instead of ChatGPT since we have that key
-  }
+  // Always default to Claude since we have a working API key
+  return 'claude';
+  
+  // Original logic commented out:
+  // if (task.includes('complex medical') || task.includes('clinical accuracy')) {
+  //   return 'claude'; // Claude may be better for complex medical content
+  // } else if (task.includes('fact check') || task.includes('research')) {
+  //   return 'perplexity'; // Perplexity is good for research tasks
+  // } else {
+  //   return 'claude'; // Default to Claude instead of ChatGPT since we have that key
+  // }
 }
 
 // Test mode response to avoid API calls during development/testing
@@ -140,14 +143,14 @@ export async function generateAIResponse(options: AIOptions): Promise<AIResponse
       throw error;
     }
     
-    // If we haven't exceeded retries, try the alternate provider with exponential backoff
+    // If we haven't exceeded retries, try again with Claude (not alternating)
     if (retryCount < MAX_RETRIES && totalAttempts < MAX_TOTAL_ATTEMPTS) {
       const delay = RETRY_DELAY_BASE * Math.pow(2, retryCount);
       console.log(`Waiting ${delay/1000} seconds before retry...`);
       await new Promise(resolve => setTimeout(resolve, delay));
       
-      // Switch between Claude and Perplexity
-      const nextProvider = provider === 'claude' ? 'perplexity' : 'claude';
+      // Always use Claude for retries instead of alternating
+      const nextProvider = 'claude';
       console.log(`Retrying with ${nextProvider}...`);
       
       try {
@@ -162,7 +165,7 @@ export async function generateAIResponse(options: AIOptions): Promise<AIResponse
         // When retry fails, add a fallback error message
         if (totalAttempts >= MAX_TOTAL_ATTEMPTS - 1) {
           // This was our last attempt, throw a final error
-          throw new Error(`All AI providers failed after ${MAX_TOTAL_ATTEMPTS} attempts. Please try again later.`);
+          throw new Error(`Claude API failed after ${MAX_TOTAL_ATTEMPTS} attempts. Please try again later.`);
         } else {
           throw retryError; // Pass through the error
         }
@@ -170,7 +173,7 @@ export async function generateAIResponse(options: AIOptions): Promise<AIResponse
     }
     
     // If we've exhausted retries, throw a final error
-    throw new Error(`All AI providers failed after ${totalAttempts} attempts. Last error: ${errorMessage}`);
+    throw new Error(`Claude API failed after ${totalAttempts} attempts. Last error: ${errorMessage}`);
   }
 }
 
