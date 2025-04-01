@@ -3,7 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { logger } from '@/utils/logger';
 
 // Add a constant for timeout duration (in milliseconds)
-const API_TIMEOUT = 30000; // 30 seconds
+const API_TIMEOUT = 120000; // 120 seconds (increased from 30s to account for slower response on render.com)
 
 export async function POST(req: Request) {
   try {

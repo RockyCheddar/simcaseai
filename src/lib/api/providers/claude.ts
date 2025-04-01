@@ -3,7 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 
 // Default model to use - using the specified model name
 const DEFAULT_MODEL = 'claude-3-7-sonnet-20250219';
-const TIMEOUT_MS = 30000; // Increasing to 30 seconds timeout
+const TIMEOUT_MS = 120000; // 120 seconds timeout (increased from 30s for render.com deployment)
 const MAX_RETRIES = 2; // Add retry capability for transient errors
 
 // Detect if we're running on the server or on the client

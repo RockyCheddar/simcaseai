@@ -14,4 +14,8 @@ services:
       - key: ANTHROPIC_API_KEY
         sync: false
     healthCheckPath: /
-    autoDeploy: true 
+    autoDeploy: true
+    serviceDetails:
+      # Increase Render's service timeout to handle longer processing
+      connectionTimeoutSeconds: 180
+      readTimeoutSeconds: 180 

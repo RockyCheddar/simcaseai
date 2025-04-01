@@ -8,7 +8,7 @@ import {
 } from './interfaces';
 
 // Constants for timeouts and retries
-export const DEFAULT_TIMEOUT = 60000;  // 60 seconds default timeout
+export const DEFAULT_TIMEOUT = 120000;  // 120 seconds default timeout (increased from 60s)
 export const MAX_RETRIES = 2;  // Maximum 2 retries
 export const MAX_TOTAL_ATTEMPTS = 3;  // Absolute maximum number of attempts regardless of provider
 export const RETRY_DELAY_BASE = 2000;  // Base delay of 2 seconds for exponential backoff

@@ -123,46 +123,66 @@ export function useAICase() {
       const system = "You are an expert in healthcare simulation design with years of experience creating realistic, educationally sound simulation scenarios for healthcare education.";
       
       console.log('Making direct API call to Claude endpoint for case generation');
-      const response = await fetch('/api/ai/claude', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          prompt,
-          temperature: 0.7,
-          max_tokens: 4000,
-          system
-        })
-      });
       
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("API error:", errorText);
-        throw new Error(`API error: ${response.status} ${response.statusText}`);
+      // Create an AbortController with a longer timeout for complex case generation
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 110000); // 110 second client-side timeout
+      
+      try {
+        const response = await fetch('/api/ai/claude', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            prompt,
+            temperature: 0.7,
+            max_tokens: 4000,
+            system
+          }),
+          signal: controller.signal
+        });
+        
+        // Clear the timeout since we got a response
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("API error:", errorText);
+          throw new Error(`API error: ${response.status} ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        if (!data.content || !data.content[0] || !data.content[0].text) {
+          throw new Error('Invalid response format from API route');
+        }
+        
+        const responseText = data.content[0].text;
+        
+        // Extract a title from the response
+        const titleMatch = responseText.match(/# (.+)|## Case Title\s*\n+(.+)/m);
+        const title = titleMatch 
+          ? (titleMatch[1] || titleMatch[2]).trim() 
+          : "Healthcare Simulation Case";
+        
+        const result = {
+          text: responseText,
+          title: title
+        };
+        
+        setGeneratedCase(result);
+        return result;
+      } catch (err: any) {
+        const errorMessage = err.message || 'Failed to generate case';
+        setError(errorMessage);
+        console.error('Error generating case:', err);
+        
+        // Generate a basic fallback case
+        return generateFallbackCase(caseParameters);
+      } finally {
+        setIsGenerating(false);
       }
-      
-      const data = await response.json();
-      
-      if (!data.content || !data.content[0] || !data.content[0].text) {
-        throw new Error('Invalid response format from API route');
-      }
-      
-      const responseText = data.content[0].text;
-      
-      // Extract a title from the response
-      const titleMatch = responseText.match(/# (.+)|## Case Title\s*\n+(.+)/m);
-      const title = titleMatch 
-        ? (titleMatch[1] || titleMatch[2]).trim() 
-        : "Healthcare Simulation Case";
-      
-      const result = {
-        text: responseText,
-        title: title
-      };
-      
-      setGeneratedCase(result);
-      return result;
     } catch (err: any) {
       const errorMessage = err.message || 'Failed to generate case';
       setError(errorMessage);
@@ -170,8 +190,6 @@ export function useAICase() {
       
       // Generate a basic fallback case
       return generateFallbackCase(caseParameters);
-    } finally {
-      setIsGenerating(false);
     }
   };
 
