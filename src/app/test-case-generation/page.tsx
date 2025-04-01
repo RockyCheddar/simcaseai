@@ -1,14 +1,18 @@
 'use client';
 
 import { useState } from 'react';
-import { generateCase } from '@/lib/api/ai-service';
-import { CaseParameters, LearningObjective } from '@/types/case';
-import MarkdownPreview from '@/components/MarkdownPreview';
 import { toast } from 'react-hot-toast';
+import { CaseParameters } from '@/types/case';
+import MarkdownPreview from '@/components/MarkdownPreview';
+import AIGenerationLoader from '@/components/AIGenerationLoader';
+import useAICase from '@/hooks/useAICase';
 
 export default function TestCaseGenerationPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedCase, setGeneratedCase] = useState<{ text: string; title: string } | null>(null);
+  
+  // Use our AI hook
+  const { generateCase } = useAICase();
   
   // Sample case parameters for testing
   const sampleParameters: CaseParameters = {

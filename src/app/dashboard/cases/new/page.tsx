@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { analyzeObjectives, generateCase } from '@/lib/api/ai-service';
 import { LearningObjective, ParameterSelections, CaseParameters } from '@/types/case';
 import { toast } from 'react-hot-toast';
 import ObjectivesAnalysisStep from './ObjectivesAnalysisStep';
@@ -10,6 +9,7 @@ import ParameterQuestionsStep from './ParameterQuestionsStep';
 import MarkdownPreview from '@/components/MarkdownPreview';
 import AIGenerationLoader from '@/components/AIGenerationLoader';
 import { useRouter } from 'next/navigation';
+import useAICase from '@/hooks/useAICase';
 
 // Step identifiers for the workflow
 type CreationStep =
@@ -40,6 +40,9 @@ export default function NewCasePage() {
   const [newObjective, setNewObjective] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const router = useRouter();
+
+  // Use our new AI hook
+  const { generateCase } = useAICase();
 
   // Function to handle method selection
   const handleMethodSelect = (method: 'scratch' | 'template' | 'import') => {

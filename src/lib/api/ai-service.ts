@@ -17,15 +17,6 @@ export const RETRY_DELAY_BASE = 2000;  // Base delay of 2 seconds for exponentia
 export function selectOptimalProvider(task: string): AIProvider {
   // Always default to Claude since we have a working API key
   return 'claude';
-  
-  // Original logic commented out:
-  // if (task.includes('complex medical') || task.includes('clinical accuracy')) {
-  //   return 'claude'; // Claude may be better for complex medical content
-  // } else if (task.includes('fact check') || task.includes('research')) {
-  //   return 'perplexity'; // Perplexity is good for research tasks
-  // } else {
-  //   return 'claude'; // Default to Claude instead of ChatGPT since we have that key
-  // }
 }
 
 // Test mode response to avoid API calls during development/testing
@@ -43,7 +34,7 @@ function getTestResponse(prompt: string, provider: AIProvider): AIResponse {
 export async function generateAIResponse(options: AIOptions): Promise<AIResponse> {
   const { 
     prompt, 
-    provider = selectOptimalProvider(prompt), 
+    provider = 'claude', 
     temperature = 0.7, 
     maxTokens = 4000,
     system,
@@ -55,11 +46,11 @@ export async function generateAIResponse(options: AIOptions): Promise<AIResponse
   
   // Hard stop if we've exceeded the total attempt limit
   if (totalAttempts > MAX_TOTAL_ATTEMPTS) {
-    throw new Error(`Maximum total attempts (${MAX_TOTAL_ATTEMPTS}) exceeded. All AI providers failed.`);
+    throw new Error(`Maximum total attempts (${MAX_TOTAL_ATTEMPTS}) exceeded. Claude API failed.`);
   }
   
   if (retryCount > MAX_RETRIES) {
-    throw new Error(`Maximum retry attempts (${MAX_RETRIES}) exceeded. All AI providers failed.`);
+    throw new Error(`Maximum retry attempts (${MAX_RETRIES}) exceeded. Claude API failed.`);
   }
   
   console.log(`Using AI provider: ${provider} (Attempt ${totalAttempts}/${MAX_TOTAL_ATTEMPTS})`);
@@ -69,6 +60,9 @@ export async function generateAIResponse(options: AIOptions): Promise<AIResponse
     return getTestResponse(prompt, provider);
   }
   
+  // Detect if we're in a browser environment
+  const isBrowser = typeof window !== 'undefined';
+  
   try {
     // Create a timeout promise
     const timeoutPromise = new Promise<never>((_, reject) => {
@@ -77,55 +71,59 @@ export async function generateAIResponse(options: AIOptions): Promise<AIResponse
       }, timeout);
     });
 
-    // Call the appropriate provider API with timeout race
-    const apiCallPromise = (async () => {
-      switch (provider) {
-        case 'claude':
-          return await callClaude({
-            prompt,
-            temperature,
-            max_tokens: maxTokens,
-            system,
-            retryCount,
-            timeout
-          });
+    // Use a different approach based on environment
+    const apiCallPromise = async () => {
+      if (isBrowser) {
+        console.log('Client-side environment detected - using API route');
         
-        case 'chatgpt':
-          return await callChatGPT({
+        // Client-side: Always use the API route
+        const response = await fetch('/api/ai/claude', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
             prompt,
             temperature,
             max_tokens: maxTokens,
-            system,
-            timeout
-          });
+            system: system || "You are a medical education expert specializing in healthcare simulation cases."
+          })
+        });
         
-        case 'perplexity':
-          return await callPerplexity({
-            prompt,
-            temperature,
-            max_tokens: maxTokens,
-            system,
-            timeout
-          });
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("API route error:", errorText);
+          throw new Error(`API route error: ${response.status} ${response.statusText}`);
+        }
         
-        case 'test':
-          return getTestResponse(prompt, 'test');
-          
-        default:
-          console.log(`Unknown provider ${provider}, falling back to Claude`);
-          return await callClaude({
-            prompt,
-            temperature,
-            max_tokens: maxTokens,
-            system,
-            retryCount,
-            timeout
-          });
+        const data = await response.json();
+        
+        if (!data.content || !data.content[0] || !data.content[0].text) {
+          throw new Error('Invalid response format from API route');
+        }
+        
+        return {
+          text: data.content[0].text,
+          provider: 'claude' as AIProvider,
+          timestamp: new Date().toISOString(),
+          modelUsed: 'claude-3-7-sonnet-20250219'
+        };
+      } else {
+        // Server-side: use the callClaude function
+        console.log('Server-side environment detected - using direct API call');
+        return await callClaude({
+          prompt,
+          temperature,
+          max_tokens: maxTokens,
+          system: system || "You are a medical education expert specializing in healthcare simulation cases.",
+          retryCount,
+          timeout
+        });
       }
-    })();
+    };
 
     // Race between the API call and timeout
-    return await Promise.race([apiCallPromise, timeoutPromise]);
+    return await Promise.race([apiCallPromise(), timeoutPromise]);
 
   } catch (error: any) {
     const errorMessage = error.message || String(error);
@@ -138,25 +136,19 @@ export async function generateAIResponse(options: AIOptions): Promise<AIResponse
       totalAttempts
     });
     
-    // Don't retry on ChatGPT errors
-    if (provider === 'chatgpt') {
-      throw error;
-    }
-    
-    // If we haven't exceeded retries, try again with Claude (not alternating)
+    // If we haven't exceeded retries, try again with exponential backoff
     if (retryCount < MAX_RETRIES && totalAttempts < MAX_TOTAL_ATTEMPTS) {
       const delay = RETRY_DELAY_BASE * Math.pow(2, retryCount);
       console.log(`Waiting ${delay/1000} seconds before retry...`);
       await new Promise(resolve => setTimeout(resolve, delay));
       
-      // Always use Claude for retries instead of alternating
-      const nextProvider = 'claude';
-      console.log(`Retrying with ${nextProvider}...`);
+      // Always use Claude for retries
+      console.log(`Retrying with claude...`);
       
       try {
         return await generateAIResponse({
           ...options,
-          provider: nextProvider,
+          provider: 'claude',
           retryCount: retryCount + 1,
           timeout: timeout * 1.5,  // Increase timeout for retries
           totalAttempts: totalAttempts + 1  // Increment total attempts

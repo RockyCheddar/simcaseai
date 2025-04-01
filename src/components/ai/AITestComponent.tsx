@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { toast } from 'react-hot-toast';
-import { generateAIResponse } from '@/lib/api/ai-service';
 import { AIResponse } from '@/lib/api/interfaces';
 import AIAnalysisDisplay from './AIAnalysisDisplay';
 
@@ -30,17 +29,61 @@ export default function AITestComponent() {
     toast.loading('Sending request...', { id: 'ai-request' });
 
     try {
-      const result = await generateAIResponse({
-        prompt,
-        provider: provider, // Explicitly pass the selected provider
-        system,
-        testMode
+      // Test mode response to avoid API calls during development/testing
+      if (testMode) {
+        const testResponse: AIResponse = {
+          text: `This is a test response to: "${prompt}"\n\nNo actual AI API was called. This is a mock response for testing purposes.`,
+          provider: provider,
+          timestamp: new Date().toISOString(),
+          modelUsed: `${provider}-test-mode`
+        };
+        
+        setResponse(testResponse);
+        toast.success(`Received test response`, { id: 'ai-request' });
+        setDebugInfo(`Test mode active\nNo API call was made.\nMock response generated at: ${new Date().toISOString()}`);
+        setIsLoading(false);
+        return;
+      }
+      
+      // Direct API call
+      console.log('Making direct API call to Claude endpoint');
+      
+      const response = await fetch('/api/ai/claude', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt,
+          temperature: 0.7,
+          max_tokens: 4000,
+          system
+        })
       });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("API error:", errorText);
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      if (!data.content || !data.content[0] || !data.content[0].text) {
+        throw new Error('Invalid response format from API route');
+      }
+      
+      const result: AIResponse = {
+        text: data.content[0].text,
+        provider: 'claude',
+        timestamp: new Date().toISOString(),
+        modelUsed: 'claude-3-7-sonnet-20250219'
+      };
       
       console.log(`Received response from ${result.provider} at ${new Date().toISOString()}`);
       setResponse(result);
-      toast.success(`Received response from ${result.provider}`, { id: 'ai-request' });
-      setDebugInfo(`Request sent at: ${callStartTime}\nResponse received at: ${new Date().toISOString()}\nProvider: ${result.provider}\nModel: ${result.modelUsed || 'unknown'}`);
+      toast.success(`Received response from Claude`, { id: 'ai-request' });
+      setDebugInfo(`Request sent at: ${callStartTime}\nResponse received at: ${new Date().toISOString()}\nProvider: Claude\nModel: claude-3-7-sonnet-20250219`);
     } catch (err: any) {
       console.error('Error testing AI:', err);
       const errorMessage = err.message || 'Failed to get AI response';

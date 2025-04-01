@@ -2,10 +2,70 @@
 
 import React, { useState, useEffect } from 'react';
 import { LearningObjective } from '@/types/case';
-import { analyzeObjectives } from '@/lib/api/ai-service';
 import AIAnalysisDisplay from '@/components/ai/AIAnalysisDisplay';
 import { AIResponse } from '@/lib/api/interfaces';
 import { toast } from 'react-hot-toast';
+
+// Direct client-side API call function
+async function analyzeObjectivesClientSide(objectives: string[]): Promise<string[]> {
+  // Format the prompt for analyzing learning objectives
+  const prompt = `
+    As a medical education expert, please analyze and refine the following learning objectives for a healthcare simulation case:
+    
+    ${objectives.map((obj, i) => `${i + 1}. ${obj}`).join('\n')}
+    
+    For each objective, provide a refined version that:
+    1. Uses specific, measurable action verbs (e.g., identify, demonstrate, analyze)
+    2. Clearly specifies the expected outcome
+    3. Aligns with healthcare professional competencies
+    4. Is concise and focused on a single learning point
+    
+    Return ONLY the refined objectives, one per line, numbered to match the original list.
+  `;
+  
+  const system = "You are an expert in medical education and healthcare simulation design with expertise in creating effective learning objectives that align with professional competencies.";
+  
+  try {
+    // Direct API call to Claude endpoint
+    console.log('Calling Claude API route from client');
+    const response = await fetch('/api/ai/claude', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        prompt,
+        temperature: 0.7,
+        max_tokens: 4000,
+        system
+      })
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("API error:", errorText);
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    if (!data.content || !data.content[0] || !data.content[0].text) {
+      throw new Error('Invalid response format from API route');
+    }
+
+    // Parse the response text into separate objectives
+    const responseText = data.content[0].text;
+    const refinedObjectives = responseText
+      .split('\n')
+      .filter((line: string) => line.trim().match(/^\d+\.\s/)) // Only lines starting with a number and period
+      .map((line: string) => line.replace(/^\d+\.\s+/, '').trim()); // Remove the numbering
+    
+    return refinedObjectives;
+  } catch (error) {
+    console.error('Error analyzing objectives:', error);
+    throw error;
+  }
+}
 
 interface ObjectivesAnalysisStepProps {
   objectives: LearningObjective[];
@@ -36,8 +96,10 @@ export default function ObjectivesAnalysisStep({
         // Extract just the text for analysis
         const objectiveTexts = objectives.map(obj => obj.text);
         
-        // Analyze with AI
-        const refinedTexts = await analyzeObjectives(objectiveTexts);
+        // Use the client-side implementation instead of the ai-service function
+        console.log('Starting client-side objectives analysis');
+        const refinedTexts = await analyzeObjectivesClientSide(objectiveTexts);
+        console.log('Analysis complete', refinedTexts);
         
         // Create new learning objective objects from the refined texts
         const refined: LearningObjective[] = refinedTexts.map((text, index) => ({
