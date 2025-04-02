@@ -1,4 +1,63 @@
 import { useState } from 'react';
+import { DynamicSection, parseContentToDynamicSections, classifyContent } from '@/utils/contentClassifier';
+
+// Define structured case data interface
+interface StructuredCaseData {
+  title: string;
+  rawText: string;
+  overview: {
+    caseSummary?: string;
+    status?: string;
+    createdDate?: string;
+    updatedDate?: string;
+    clinicalSetting?: string;
+    learningObjectives?: string[];
+  };
+  patientInfo: {
+    name?: string;
+    age?: string;
+    gender?: string;
+    occupation?: string;
+    chiefComplaint?: string;
+    briefHistory?: string;
+    conditions?: string[];
+    medications?: { name: string; dosage: string }[];
+    allergies?: { allergen: string; reaction: string }[];
+    livingSituation?: string;
+    socialContext?: string;
+    [key: string]: any;
+  };
+  presentation: {
+    vitalSigns?: any[];
+    physicalExam?: any[];
+    diagnosticStudies?: any[];
+    doctorNotes?: any[];
+    [key: string]: any;
+  };
+  treatment: {
+    initialManagement?: any[];
+    treatmentPlan?: any;
+    progressionScenarios?: any[];
+    clinicalCourse?: any;
+    [key: string]: any;
+  };
+  simulation: {
+    nursingCompetencies?: any[];
+    questionsToConsider?: any[];
+    gradingRubric?: any[];
+    skillsAssessment?: any[];
+    debriefingPoints?: string[];
+    teachingPlan?: string;
+    [key: string]: any;
+  };
+  dynamicSections: {
+    overview: DynamicSection[];
+    'patient-info': DynamicSection[];
+    presentation: DynamicSection[];
+    treatment: DynamicSection[];
+    simulation: DynamicSection[];
+  };
+}
 
 /**
  * Client-side hook for generating simulation cases
@@ -6,12 +65,203 @@ import { useState } from 'react';
 export function useAICase() {
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [generatedCase, setGeneratedCase] = useState<{ text: string; title: string } | null>(null);
+  const [generatedCase, setGeneratedCase] = useState<StructuredCaseData | null>(null);
+
+  /**
+   * Parse the markdown text into structured sections for the tabs
+   */
+  const parseGeneratedCaseText = (text: string, title: string): StructuredCaseData => {
+    // Default structure
+    const structuredData: StructuredCaseData = {
+      title,
+      rawText: text,
+      overview: {
+        caseSummary: '',
+        status: 'Draft',
+        createdDate: new Date().toISOString(),
+        updatedDate: new Date().toISOString(),
+        clinicalSetting: '',
+        learningObjectives: []
+      },
+      patientInfo: {},
+      presentation: {},
+      treatment: {},
+      simulation: {},
+      dynamicSections: {
+        overview: [],
+        'patient-info': [],
+        presentation: [],
+        treatment: [],
+        simulation: []
+      }
+    };
+
+    // Extract learning objectives
+    const learningObjectivesMatch = text.match(/## Learning Objectives\s*\n([\s\S]*?)(?=##|$)/);
+    if (learningObjectivesMatch && learningObjectivesMatch[1]) {
+      structuredData.overview.learningObjectives = learningObjectivesMatch[1]
+        .split('\n')
+        .filter(line => line.trim().match(/^\d+\.\s+/))
+        .map(line => line.replace(/^\d+\.\s+/, '').trim());
+    }
+
+    // Extract patient information
+    const patientInfoMatch = text.match(/## Patient Information\s*\n([\s\S]*?)(?=##|$)/);
+    if (patientInfoMatch && patientInfoMatch[1]) {
+      const patientInfoText = patientInfoMatch[1];
+      
+      // Try to extract name
+      const nameMatch = patientInfoText.match(/Name.*?:\s*(.*?)(?:\n|$)/i);
+      if (nameMatch) structuredData.patientInfo.name = nameMatch[1].trim();
+      
+      // Try to extract age
+      const ageMatch = patientInfoText.match(/Age.*?:\s*(.*?)(?:\n|$)/i);
+      if (ageMatch) structuredData.patientInfo.age = ageMatch[1].trim();
+      
+      // Try to extract gender
+      const genderMatch = patientInfoText.match(/Gender.*?:\s*(.*?)(?:\n|$)/i);
+      if (genderMatch) structuredData.patientInfo.gender = genderMatch[1].trim();
+      
+      // Try to extract occupation
+      const occupationMatch = patientInfoText.match(/Occupation.*?:\s*(.*?)(?:\n|$)/i);
+      if (occupationMatch) structuredData.patientInfo.occupation = occupationMatch[1].trim();
+      
+      // Try to extract chief complaint
+      const chiefComplaintMatch = patientInfoText.match(/Chief [Cc]omplaint.*?:\s*(.*?)(?:\n|$)/i);
+      if (chiefComplaintMatch) structuredData.patientInfo.chiefComplaint = chiefComplaintMatch[1].trim();
+      
+      // Try to extract brief history
+      const briefHistoryMatch = patientInfoText.match(/(?:Brief )?[Hh]istory of [Pp]resent [Ii]llness.*?:\s*(.*?)(?=\n- |$)/);
+      if (briefHistoryMatch) structuredData.patientInfo.briefHistory = briefHistoryMatch[1].trim();
+      
+      // Add dynamic sections for patient info
+      const patientInfoSections = parseContentToDynamicSections(patientInfoMatch[1]);
+      structuredData.dynamicSections['patient-info'] = patientInfoSections;
+    }
+
+    // Extract initial presentation
+    const presentationMatch = text.match(/## (?:Initial )?Presentation\s*\n([\s\S]*?)(?=##|$)/);
+    if (presentationMatch && presentationMatch[1]) {
+      // Add dynamic sections for presentation
+      const presentationSections = parseContentToDynamicSections(presentationMatch[1]);
+      structuredData.dynamicSections.presentation = presentationSections;
+      
+      // Extract vital signs
+      const vitalSignsMatch = presentationMatch[1].match(/(?:Vital [Ss]igns|Vitals).*?:([\s\S]*?)(?=\n\n|\n- [^\n]*:|$)/);
+      if (vitalSignsMatch) {
+        const vitalSignLines = vitalSignsMatch[1].split('\n').filter(line => line.trim().startsWith('-'));
+        structuredData.presentation.vitalSigns = vitalSignLines.map(line => {
+          const [name, value] = line.replace(/^-\s*/, '').split(':').map(s => s.trim());
+          return { name, value, unit: '', isAbnormal: false };
+        });
+      }
+    }
+
+    // Extract treatment information
+    const treatmentMatch = text.match(/## (?:Treatment|Management|Interventions)\s*\n([\s\S]*?)(?=##|$)/i);
+    if (treatmentMatch && treatmentMatch[1]) {
+      // Add dynamic sections for treatment
+      const treatmentSections = parseContentToDynamicSections(treatmentMatch[1]);
+      structuredData.dynamicSections.treatment = treatmentSections;
+    }
+
+    // Extract progression scenarios
+    const progressionMatch = text.match(/## Progression Scenarios\s*\n([\s\S]*?)(?=##|$)/);
+    if (progressionMatch && progressionMatch[1]) {
+      // Add to treatment tab
+      const progressionSections = parseContentToDynamicSections(progressionMatch[1]);
+      structuredData.dynamicSections.treatment.push(...progressionSections);
+      
+      // Attempt to parse progression scenarios as structured data
+      const scenarios = progressionMatch[1].split(/\d+\.\s+/).filter(s => s.trim());
+      structuredData.treatment.progressionScenarios = scenarios.map(scenario => {
+        const lines = scenario.split('\n').filter(line => line.trim());
+        const title = lines[0]?.trim() || 'Scenario';
+        const content = lines.slice(1).join('\n');
+        
+        return {
+          title,
+          intervention: 'See scenario details',
+          response: content,
+          additionalNotes: ''
+        };
+      });
+    }
+
+    // Extract educational notes and debriefing
+    const educationalNotesMatch = text.match(/## Educational Notes\s*\n([\s\S]*?)(?=##|$)/i);
+    const debriefingMatch = text.match(/## Debriefing Guide\s*\n([\s\S]*?)(?=##|$)/i);
+    
+    if (educationalNotesMatch && educationalNotesMatch[1]) {
+      const educationalSections = parseContentToDynamicSections(educationalNotesMatch[1]);
+      structuredData.dynamicSections.simulation.push(...educationalSections);
+    }
+    
+    if (debriefingMatch && debriefingMatch[1]) {
+      const debriefingSections = parseContentToDynamicSections(debriefingMatch[1]);
+      structuredData.dynamicSections.simulation.push(...debriefingSections);
+      
+      // Extract debriefing points
+      const points = debriefingMatch[1]
+        .split('\n')
+        .filter(line => line.trim().match(/^-\s+/))
+        .map(line => line.replace(/^-\s+/, '').trim());
+      
+      if (points.length > 0) {
+        structuredData.simulation.debriefingPoints = points;
+      }
+    }
+
+    // Add a summary section to overview
+    const caseSummaryFromText = text.substring(0, 500).replace(/#+\s*.*?\n/g, '').trim();
+    if (caseSummaryFromText) {
+      structuredData.overview.caseSummary = caseSummaryFromText;
+      structuredData.dynamicSections.overview.push({
+        title: "Case Summary",
+        content: caseSummaryFromText.substring(0, 300) + (caseSummaryFromText.length > 300 ? '...' : ''),
+        contentType: "text"
+      });
+    }
+
+    // Process any remaining sections as dynamic content
+    const remainingSections = text.split(/##\s+/g).slice(1); // Skip the first element which is before any ##
+    remainingSections.forEach(sectionText => {
+      const lines = sectionText.split('\n').filter(l => l.trim());
+      if (lines.length === 0) return;
+      
+      const sectionTitle = lines[0].trim();
+      const sectionContent = lines.slice(1).join('\n').trim();
+      
+      if (!sectionTitle || !sectionContent) return;
+      
+      // Skip sections we've already processed
+      const knownSections = [
+        'Learning Objectives', 'Patient Information', 'Initial Presentation', 
+        'Presentation', 'Treatment', 'Management', 'Interventions',
+        'Progression Scenarios', 'Educational Notes', 'Debriefing Guide'
+      ];
+      
+      if (knownSections.some(s => sectionTitle.includes(s))) return;
+      
+      // Classify the content to determine which tab it belongs to
+      const tabCategory = classifyContent(sectionTitle + ' ' + sectionContent);
+      
+      const dynamicSection: DynamicSection = {
+        title: sectionTitle,
+        content: sectionContent,
+        contentType: sectionContent.includes('\n- ') ? 'list' : 'text'
+      };
+      
+      structuredData.dynamicSections[tabCategory].push(dynamicSection);
+    });
+
+    return structuredData;
+  };
 
   /**
    * Generates a complete educational simulation case based on the provided parameters
    */
-  const generateCase = async (caseParameters: any): Promise<{ text: string; title: string; }> => {
+  const generateCase = async (caseParameters: any): Promise<StructuredCaseData> => {
     setIsGenerating(true);
     setError(null);
     
@@ -101,17 +351,28 @@ export function useAICase() {
            - Include at least 3 possible progression points
            - For each progression, describe changes in condition, vital signs, and appropriate interventions
         
-        6. ## Case Documentation
+        6. ## Treatment Plan
+           - Initial management steps
+           - Medications
+           - Procedures
+           - Monitoring parameters
+        
+        7. ## Case Documentation
            - Include sample documentation based on the specified documentation types
            - Laboratory results (if applicable)
            - Diagnostic findings (if applicable)
         
-        7. ## Educational Notes
+        8. ## Educational Notes
            - Specific teaching points related to the case
            - Common pitfalls or challenges
            - Key decision points and critical actions
         
-        8. ## Debriefing Guide
+        9. ## Simulation Learning
+           - Essential skills to be practiced
+           - Assessment criteria
+           - Suggested simulation setup
+        
+        10. ## Debriefing Guide
            - Questions to discuss with learners
            - Expected outcomes
            - Areas for reflection
@@ -166,13 +427,11 @@ export function useAICase() {
           ? (titleMatch[1] || titleMatch[2]).trim() 
           : "Healthcare Simulation Case";
         
-        const result = {
-          text: responseText,
-          title: title
-        };
+        // Parse the generated text into structured data
+        const structuredData = parseGeneratedCaseText(responseText, title);
         
-        setGeneratedCase(result);
-        return result;
+        setGeneratedCase(structuredData);
+        return structuredData;
       } catch (err: any) {
         const errorMessage = err.message || 'Failed to generate case';
         setError(errorMessage);
@@ -196,7 +455,7 @@ export function useAICase() {
   /**
    * Generates a simple fallback case when the API call fails
    */
-  const generateFallbackCase = (caseParameters: any): { text: string; title: string } => {
+  const generateFallbackCase = (caseParameters: any): StructuredCaseData => {
     console.log('Using fallback case structure due to API error');
     
     // Create a basic title based on the learning objectives
@@ -247,6 +506,11 @@ export function useAICase() {
      - A complication develops related to the primary condition.
      - Requires additional interventions.
   
+  ## Treatment Plan
+  - Initial steps: Assessment and stabilization
+  - Medications: As appropriate for the condition
+  - Monitoring: Vital signs and response to treatment
+  
   ## Case Documentation
   - Basic documentation templates provided
   - Laboratory results: Within normal ranges except those relevant to the condition
@@ -257,6 +521,10 @@ export function useAICase() {
   - Focus on key decision points: ${caseParameters.educationalElements?.learnerDecisionPoints?.join(', ') || "assessment, diagnosis, and treatment"}
   - Critical actions: ${caseParameters.educationalElements?.criticalActions?.join(', ') || "proper assessment and management"}
   
+  ## Simulation Learning
+  - Skills to practice: Assessment, communication, clinical reasoning
+  - Setup: Standard simulation room with appropriate monitoring equipment
+  
   ## Debriefing Guide
   - What was your initial approach to this case?
   - What were the key findings that influenced your decision-making?
@@ -264,11 +532,8 @@ export function useAICase() {
   - What would you do differently next time?
   - How does this case relate to your clinical practice?
   `;
-  
-    return {
-      text: caseText,
-      title: title
-    };
+    
+    return parseGeneratedCaseText(caseText, title);
   };
 
   return {
@@ -276,6 +541,7 @@ export function useAICase() {
     isGenerating,
     error,
     generatedCase,
+    parseGeneratedCaseText
   };
 }
 

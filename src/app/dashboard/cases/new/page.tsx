@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import useAICase from '@/hooks/useAICase';
 import { Tab } from '@headlessui/react';
 import CaseTabs from '@/components/CaseTabs';
+import { DynamicSection } from '@/utils/contentClassifier';
 
 // Step identifiers for the workflow
 type CreationStep =
@@ -29,6 +30,64 @@ type CreationStep =
   | 'review'
   | 'complete';
 
+// Define StructuredCaseData interface 
+interface StructuredCaseData {
+  title: string;
+  rawText: string;
+  overview: {
+    caseSummary?: string;
+    status?: string;
+    createdDate?: string;
+    updatedDate?: string;
+    clinicalSetting?: string;
+    learningObjectives?: string[];
+  };
+  patientInfo: {
+    name?: string;
+    age?: string;
+    gender?: string;
+    occupation?: string;
+    chiefComplaint?: string;
+    briefHistory?: string;
+    conditions?: string[];
+    medications?: { name: string; dosage: string }[];
+    allergies?: { allergen: string; reaction: string }[];
+    livingSituation?: string;
+    socialContext?: string;
+    [key: string]: any;
+  };
+  presentation: {
+    vitalSigns?: any[];
+    physicalExam?: any[];
+    diagnosticStudies?: any[];
+    doctorNotes?: any[];
+    [key: string]: any;
+  };
+  treatment: {
+    initialManagement?: any[];
+    treatmentPlan?: any;
+    progressionScenarios?: any[];
+    clinicalCourse?: any;
+    [key: string]: any;
+  };
+  simulation: {
+    nursingCompetencies?: any[];
+    questionsToConsider?: any[];
+    gradingRubric?: any[];
+    skillsAssessment?: any[];
+    debriefingPoints?: string[];
+    teachingPlan?: string;
+    [key: string]: any;
+  };
+  dynamicSections: {
+    overview: DynamicSection[];
+    'patient-info': DynamicSection[];
+    presentation: DynamicSection[];
+    treatment: DynamicSection[];
+    simulation: DynamicSection[];
+  };
+}
+
 export default function NewCasePage() {
   const [currentStep, setCurrentStep] = useState<CreationStep>('method');
   const [creationMethod, setCreationMethod] = useState<'scratch' | 'template' | 'import' | null>(null);
@@ -37,7 +96,7 @@ export default function NewCasePage() {
   const [finalObjectives, setFinalObjectives] = useState<LearningObjective[]>([]);
   const [parameterSelections, setParameterSelections] = useState<ParameterSelections>({});
   const [caseParameters, setCaseParameters] = useState<CaseParameters | null>(null);
-  const [generatedCase, setGeneratedCase] = useState<{ id: string; text: string; title: string } | null>(null);
+  const [generatedCase, setGeneratedCase] = useState<StructuredCaseData | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [newObjective, setNewObjective] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -112,11 +171,7 @@ export default function NewCasePage() {
 
     try {
       const result = await generateCase(caseParameters);
-      setGeneratedCase({
-        id: `case-${Date.now()}`,
-        text: result.text,
-        title: result.title
-      });
+      setGeneratedCase(result);
       setCurrentStep('preview');
       toast.success('Case generated successfully!');
     } catch (error) {
@@ -487,135 +542,16 @@ export default function NewCasePage() {
             
             {generatedCase ? (
               <div className="mb-6">
-                <Tab.Group>
-                  <CaseTabs tabs={[
+                <CaseTabs 
+                  tabs={[
                     { name: 'Overview', current: true },
                     { name: 'Patient Info', current: false },
                     { name: 'Presentation', current: false },
                     { name: 'Treatment', current: false },
                     { name: 'Simulation Learning', current: false },
-                  ]}>
-                    {/* Overview Tab */}
-                    <Tab.Panel>
-                      <div className="bg-white p-6 rounded-lg shadow">
-                        <div className="flex items-center justify-between">
-                          <h2 className="text-lg font-medium">Overview</h2>
-                        </div>
-                        <div className="mt-4 prose max-w-none">
-                          <MarkdownPreview markdown={generatedCase.text} title={generatedCase.title} />
-                        </div>
-                      </div>
-                    </Tab.Panel>
-                    
-                    {/* Patient Info Tab */}
-                    <Tab.Panel>
-                      <div className="bg-white p-6 rounded-lg shadow">
-                        <div className="flex items-center justify-between">
-                          <h2 className="text-lg font-medium">Patient Info</h2>
-                        </div>
-                        <div className="mt-4">
-                          {caseParameters?.demographics && (
-                            <div className="space-y-4">
-                              <h3 className="text-md font-medium text-gray-900">Demographics</h3>
-                              <div className="grid grid-cols-2 gap-4">
-                                {Object.entries(caseParameters.demographics).map(([key, value]) => (
-                                  <div key={key} className="mb-2">
-                                    <span className="text-sm font-medium text-gray-500">{key}:</span>
-                                    <p className="text-gray-800">{typeof value === 'string' ? value : Array.isArray(value) ? value.join(', ') : JSON.stringify(value)}</p>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </Tab.Panel>
-                    
-                    {/* Presentation Tab */}
-                    <Tab.Panel>
-                      <div className="space-y-6">
-                        <div className="bg-white p-6 rounded-lg shadow">
-                          <div className="flex items-center justify-between">
-                            <h2 className="text-lg font-medium">Vital Signs</h2>
-                          </div>
-                          <div className="mt-4">
-                            {caseParameters?.recommendedVitalSigns && (
-                              <div className="grid grid-cols-2 gap-4">
-                                {Object.entries(caseParameters.recommendedVitalSigns).map(([key, value]) => (
-                                  <div key={key}>
-                                    <span className="text-sm font-medium text-gray-500">{key}:</span>
-                                    <p className="text-gray-800">
-                                      {typeof value === 'object' && 'min' in value && 'max' in value
-                                        ? `${value.min}-${value.max}`
-                                        : String(value)}
-                                    </p>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        
-                        <div className="bg-white p-6 rounded-lg shadow">
-                          <div className="flex items-center">
-                            <h2 className="text-lg font-medium">Physical Examination</h2>
-                          </div>
-                          <div className="mt-4">
-                            {caseParameters?.complexity?.abnormalFindings && (
-                              <div className="space-y-2">
-                                {caseParameters.complexity.abnormalFindings.map((finding: string, index: number) => (
-                                  <p key={index}>{finding}</p>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </Tab.Panel>
-                    
-                    {/* Treatment Tab */}
-                    <Tab.Panel>
-                      <div className="bg-white p-6 rounded-lg shadow">
-                        <div className="flex items-center justify-between">
-                          <h2 className="text-lg font-medium">Treatment</h2>
-                        </div>
-                        <div className="mt-4">
-                          {caseParameters?.clinicalContext?.availableResources && (
-                            <div className="space-y-4">
-                              <h3 className="text-md font-medium text-gray-900">Available Resources</h3>
-                              <ul className="list-disc pl-5">
-                                {caseParameters.clinicalContext.availableResources.map((resource: string, index: number) => (
-                                  <li key={index}>{resource}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </Tab.Panel>
-                    
-                    {/* Simulation Learning Tab */}
-                    <Tab.Panel>
-                      <div className="bg-white p-6 rounded-lg shadow">
-                        <div className="flex items-center justify-between">
-                          <h2 className="text-lg font-medium">Simulation Learning</h2>
-                        </div>
-                        <div className="mt-4">
-                          {caseParameters?.learningObjectives && (
-                            <div className="space-y-4">
-                              <h3 className="text-md font-medium text-gray-900">Learning Objectives</h3>
-                              <ul className="list-disc pl-5">
-                                {caseParameters.learningObjectives.map((objective: any, index: number) => (
-                                  <li key={index}>{objective.text}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </Tab.Panel>
-                  </CaseTabs>
-                </Tab.Group>
+                  ]}
+                  caseData={generatedCase}
+                />
                 
                 <div className="flex justify-between mt-8">
                   <button 
@@ -629,26 +565,27 @@ export default function NewCasePage() {
                       try {
                         // Create a full case data object
                         const fullCaseData = {
-                          id: generatedCase.id,
+                          id: generatedCase.title ? generatedCase.title.replace(/\s+/g, '-').toLowerCase() : `case-${Date.now()}`,
                           title: generatedCase.title,
-                          text: generatedCase.text,
+                          rawText: generatedCase.rawText,
                           status: "complete",
                           createdAt: new Date().toISOString(),
                           updatedAt: new Date().toISOString(),
-                          demographics: caseParameters?.demographics || {},
-                          clinicalContext: caseParameters?.clinicalContext || {},
-                          complexity: caseParameters?.complexity || {},
-                          recommendedVitalSigns: caseParameters?.recommendedVitalSigns || {},
-                          learningObjectives: caseParameters?.learningObjectives || [],
-                          educationalElements: caseParameters?.educationalElements || {}
+                          overview: generatedCase.overview,
+                          patientInfo: generatedCase.patientInfo,
+                          presentation: generatedCase.presentation,
+                          treatment: generatedCase.treatment,
+                          simulation: generatedCase.simulation,
+                          dynamicSections: generatedCase.dynamicSections,
+                          parameters: caseParameters
                         };
                         
                         // Save to localStorage
-                        localStorage.setItem(`case-${generatedCase.id}`, JSON.stringify(fullCaseData));
+                        localStorage.setItem(`case-${fullCaseData.id}`, JSON.stringify(fullCaseData));
                         toast.success('Case saved successfully!');
                         
                         // Redirect to the case detail page with the new case ID
-                        router.push(`/dashboard/cases/${generatedCase.id}`);
+                        router.push(`/dashboard/cases/${fullCaseData.id}`);
                       } catch (error) {
                         console.error('Error saving case:', error);
                         toast.error('Failed to save case. Please try again.');
