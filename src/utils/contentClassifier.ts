@@ -14,20 +14,31 @@ export interface DynamicSection {
 }
 
 /**
+ * Interface for diagnostic studies
+ */
+export interface DiagnosticStudy {
+  name: string;
+  result: string;
+  normalRange: string;
+  date: string;
+  isAbnormal: boolean;
+}
+
+/**
  * Content classifier - determines which tab is most appropriate for given content
  */
 export function classifyContent(content: string): TabCategory {
   // Convert to lowercase for case-insensitive matching
   const lowerContent = content.toLowerCase();
   
+  // Educational/simulation related keywords - check these first as they are more specific
+  if (lowerContent.match(/simulation|learning|education|competency|objective|skill|training|assessment|evaluation|scenario|debriefing|teaching|pitfall|decision point|key point|key decision|critical action/i)) {
+    return 'simulation';
+  }
+  
   // Treatment related keywords
   if (lowerContent.match(/treatment|medication|therapy|prescri|dosage|intervention|management|care plan|drug|administer|dose|regimen/i)) {
     return 'treatment';
-  }
-  
-  // Simulation learning related keywords
-  if (lowerContent.match(/simulation|learning|education|competency|objective|skill|training|assessment|evaluation|scenario|debriefing|teaching/i)) {
-    return 'simulation';
   }
   
   // Patient information related keywords
@@ -446,6 +457,94 @@ export function parsePresentationData(text: string): Record<string, any> {
             value: line,
             unit: '',
             isAbnormal: false
+          });
+        }
+      }
+    });
+  }
+  
+  // Additional function to parse lab results with reference ranges
+  const parseLabLine = (line: string): DiagnosticStudy | null => {
+    // Format: - [Test]: [Value] [(High/Low)] [Reference: Range]
+    const labPattern = /^(?:-\s*)?([^:]+):\s*([^[\(]+)(?:\s*\(([^)]+)\))?(?:\s*\[Reference:?\s*([^\]]+)\])?/i;
+    const match = line.match(labPattern);
+    
+    if (match) {
+      const [_, name, value, abnormalFlag, referenceRange] = match;
+      const isAbnormal = abnormalFlag ? 
+                        /high|elevated|low|decreased|abnormal/i.test(abnormalFlag) : 
+                        false;
+      
+      return {
+        name: name.trim().replace(/^-\s*/, ''),
+        result: value.trim() + (abnormalFlag ? ` (${abnormalFlag})` : ''),
+        normalRange: referenceRange ? referenceRange.trim() : '',
+        isAbnormal,
+        date: new Date().toISOString().split('T')[0]
+      };
+    }
+    
+    // Alternative format: Test: Value (Reference: Range)
+    const altPattern = /^(?:-\s*)?([^:]+):\s*([^(]+)(?:\s*\((?:Reference:?\s*([^)]+)|([^)]+))\))?/i;
+    const altMatch = line.match(altPattern);
+    
+    if (altMatch) {
+      const [_, name, value, referenceRange, abnormalFlag] = altMatch;
+      const isAbnormal = abnormalFlag ? 
+                        /high|elevated|low|decreased|abnormal/i.test(abnormalFlag) : 
+                        false;
+      
+      return {
+        name: name.trim().replace(/^-\s*/, ''),
+        result: value.trim(),
+        normalRange: referenceRange ? referenceRange.trim() : '',
+        isAbnormal: isAbnormal || isLikelyAbnormal(value),
+        date: new Date().toISOString().split('T')[0]
+      };
+    }
+    
+    return null;
+  };
+  
+  // Look for a laboratory results section
+  const labResultsMatch = text.match(/(?:\*\*)?(?:Laboratory Results|Lab Results|Labs|Comprehensive Metabolic Panel|Complete Blood Count)(?:\*\*)?:?\s*([\s\S]*?)(?=\n\n|\n\s*\n|\n\*\*|\n## |$)/i);
+  
+  if (labResultsMatch && labResultsMatch[1]) {
+    const labResultsText = labResultsMatch[1].trim().replace(/\*\*/g, '');
+    
+    // Check for structured lab results
+    const labLines = labResultsText.split('\n')
+      .filter(line => line.trim())
+      .map(line => line.trim().replace(/^[•\-*]\s+/, ''));
+    
+    // Process each lab line
+    labLines.forEach(line => {
+      // Special handling for dates and headers
+      if (line.match(/^(?:Results|Specimen|Collection) (?:Date|Time):/i) || 
+          line.match(/^Complete Blood Count:?$/i) || 
+          line.match(/^Metabolic Panel:?$/i) ||
+          line.match(/^Comprehensive Metabolic Panel:?$/i) ||
+          line.match(/^Chemistry Panel:?$/i) ||
+          line.match(/^\.\.\.$/) ||
+          line.length < 3) {
+        // Skip headers and decorative lines
+        return;
+      }
+      
+      const parsedLab = parseLabLine(line);
+      if (parsedLab) {
+        presentationData.diagnosticStudies.push(parsedLab);
+      }
+      // If not a standard lab format, still try to extract info
+      else if (line.includes(':')) {
+        const [name, result] = line.split(':').map(part => part.trim());
+        if (name && result) {
+          presentationData.diagnosticStudies.push({
+            name,
+            result,
+            normalRange: '',
+            isAbnormal: isLikelyAbnormal(result),
+            date: new Date().toISOString().split('T')[0]
           });
         }
       }

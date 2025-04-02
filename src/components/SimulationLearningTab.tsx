@@ -55,6 +55,23 @@ function SimulationLearningTab({ simulationData, dynamicSections = [] }: Simulat
   const criticalThinkingAssessments = skillsAssessment.filter(a => a.category === 'criticalThinking');
   const communicationAssessments = skillsAssessment.filter(a => a.category === 'communication');
   
+  // Extract Common Pitfalls and Key Decision Points from dynamic sections
+  const commonPitfallsSections = dynamicSections.filter(section => 
+    section.title.toLowerCase().includes('pitfall') ||
+    section.title.toLowerCase().includes('common error')
+  );
+  
+  const keyDecisionPointsSections = dynamicSections.filter(section => 
+    section.title.toLowerCase().includes('decision point') ||
+    section.title.toLowerCase().includes('key decision')
+  );
+  
+  // Remaining dynamic sections after removing pitfalls and decision points
+  const remainingDynamicSections = dynamicSections.filter(section => 
+    !commonPitfallsSections.includes(section) && 
+    !keyDecisionPointsSections.includes(section)
+  );
+  
   return (
     <div className="space-y-6">
       {/* Nursing Competencies Section */}
@@ -100,6 +117,62 @@ function SimulationLearningTab({ simulationData, dynamicSections = [] }: Simulat
           </ul>
         </div>
       </div>
+
+      {/* Key Decision Points Section (from dynamic content) */}
+      {keyDecisionPointsSections.length > 0 && (
+        <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
+          <div className="px-4 py-5 sm:px-6">
+            <h3 className="text-lg font-semibold text-gray-900">Key Decision Points</h3>
+            <p className="mt-1 max-w-2xl text-sm text-gray-500">Critical decision-making moments in the simulation</p>
+          </div>
+          <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
+            {keyDecisionPointsSections.map((section, idx) => (
+              <div key={idx} className="mb-6 last:mb-0">
+                {section.title !== "Key Decision Points" && (
+                  <h4 className="text-base font-medium text-gray-700 mb-2">{section.title}</h4>
+                )}
+                {Array.isArray(section.content) ? (
+                  <ol className="list-decimal pl-5 space-y-2">
+                    {section.content.map((item, i) => (
+                      <li key={i} className="text-sm text-gray-700">{item}</li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="text-sm text-gray-700 whitespace-pre-line">{section.content}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Common Pitfalls Section (from dynamic content) */}
+      {commonPitfallsSections.length > 0 && (
+        <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
+          <div className="px-4 py-5 sm:px-6">
+            <h3 className="text-lg font-semibold text-gray-900">Common Pitfalls</h3>
+            <p className="mt-1 max-w-2xl text-sm text-gray-500">Frequent errors and challenges to address</p>
+          </div>
+          <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
+            {commonPitfallsSections.map((section, idx) => (
+              <div key={idx} className="mb-6 last:mb-0">
+                {section.title !== "Common Pitfalls" && (
+                  <h4 className="text-base font-medium text-gray-700 mb-2">{section.title}</h4>
+                )}
+                {Array.isArray(section.content) ? (
+                  <ol className="list-decimal pl-5 space-y-2">
+                    {section.content.map((item, i) => (
+                      <li key={i} className="text-sm text-gray-700">{item}</li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="text-sm text-gray-700 whitespace-pre-line">{section.content}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Grading Rubric Section */}
       <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
@@ -258,9 +331,9 @@ function SimulationLearningTab({ simulationData, dynamicSections = [] }: Simulat
         </div>
       )}
 
-      {/* Dynamic Sections */}
-      {dynamicSections.length > 0 && (
-        <DynamicContentSection sections={dynamicSections} />
+      {/* Remaining Dynamic Sections */}
+      {remainingDynamicSections.length > 0 && (
+        <DynamicContentSection sections={remainingDynamicSections} />
       )}
     </div>
   );
