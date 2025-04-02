@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { DynamicSection, parseContentToDynamicSections, classifyContent } from '@/utils/contentClassifier';
+import { DynamicSection, parseContentToDynamicSections, classifyContent, enhancedParsePatientInfoSection } from '@/utils/contentClassifier';
 
 // Define structured case data interface
 interface StructuredCaseData {
@@ -110,29 +110,9 @@ export function useAICase() {
     if (patientInfoMatch && patientInfoMatch[1]) {
       const patientInfoText = patientInfoMatch[1];
       
-      // Try to extract name
-      const nameMatch = patientInfoText.match(/Name.*?:\s*(.*?)(?:\n|$)/i);
-      if (nameMatch) structuredData.patientInfo.name = nameMatch[1].trim();
-      
-      // Try to extract age
-      const ageMatch = patientInfoText.match(/Age.*?:\s*(.*?)(?:\n|$)/i);
-      if (ageMatch) structuredData.patientInfo.age = ageMatch[1].trim();
-      
-      // Try to extract gender
-      const genderMatch = patientInfoText.match(/Gender.*?:\s*(.*?)(?:\n|$)/i);
-      if (genderMatch) structuredData.patientInfo.gender = genderMatch[1].trim();
-      
-      // Try to extract occupation
-      const occupationMatch = patientInfoText.match(/Occupation.*?:\s*(.*?)(?:\n|$)/i);
-      if (occupationMatch) structuredData.patientInfo.occupation = occupationMatch[1].trim();
-      
-      // Try to extract chief complaint
-      const chiefComplaintMatch = patientInfoText.match(/Chief [Cc]omplaint.*?:\s*(.*?)(?:\n|$)/i);
-      if (chiefComplaintMatch) structuredData.patientInfo.chiefComplaint = chiefComplaintMatch[1].trim();
-      
-      // Try to extract brief history
-      const briefHistoryMatch = patientInfoText.match(/(?:Brief )?[Hh]istory of [Pp]resent [Ii]llness.*?:\s*(.*?)(?=\n- |$)/);
-      if (briefHistoryMatch) structuredData.patientInfo.briefHistory = briefHistoryMatch[1].trim();
+      // Use the enhanced parser for better structured data
+      const parsedPatientInfo = enhancedParsePatientInfoSection(patientInfoText);
+      structuredData.patientInfo = { ...parsedPatientInfo };
       
       // Add dynamic sections for patient info
       const patientInfoSections = parseContentToDynamicSections(patientInfoMatch[1]);
