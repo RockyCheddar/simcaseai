@@ -43,6 +43,7 @@ interface StructuredCaseData {
     physicalExam?: any[];
     diagnosticStudies?: any[];
     doctorNotes?: any[];
+    initialAssessment?: string;
     [key: string]: any;
   };
   treatment: {
@@ -153,6 +154,7 @@ export default function CaseTabs({ tabs, caseData, children }: CaseTabsProps) {
                   physicalExam: caseData.presentation.physicalExam || [],
                   diagnosticStudies: caseData.presentation.diagnosticStudies || [],
                   doctorNotes: caseData.presentation.doctorNotes || [],
+                  initialAssessment: caseData.presentation.initialAssessment || '',
                 }}
                 dynamicSections={caseData.dynamicSections.presentation}
               />

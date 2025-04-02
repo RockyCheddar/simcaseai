@@ -269,4 +269,423 @@ export function enhancedParsePatientInfoSection(patientInfoText: string): Record
   }
   
   return detailedInfo;
+}
+
+/**
+ * Parse presentation section text into structured data
+ */
+export function parsePresentationData(text: string): Record<string, any> {
+  const presentationData: Record<string, any> = {
+    vitalSigns: [],
+    physicalExam: [],
+    diagnosticStudies: [],
+    doctorNotes: [],
+    initialAssessment: ''
+  };
+  
+  // Extract vital signs - check for multiple formats
+  // Format 1: "Vital Signs:" followed by a list with "- name: value"
+  // Format 2: "- **Vital signs**" followed by bullet points with values
+  // Format 3: "**Vital signs**" followed by a list of values 
+  
+  // First, try to find a dedicated vital signs section
+  let vitalSignsText = '';
+  
+  // Try format 1: Look for "Vital Signs:" header
+  const vitalSignsMatch = text.match(/(?:\*\*)?(?:Vital [Ss]igns|Vitals)(?:\*\*)?:?\s*([\s\S]*?)(?=\n\n|\n\s*\n|\n\*\*|\n\s*-\s*[A-Z]|$)/i);
+  if (vitalSignsMatch && vitalSignsMatch[1]) {
+    vitalSignsText = vitalSignsMatch[1].trim();
+  } else {
+    // Try format 2: Look for "- **Vital signs**" bullet point
+    const bulletVitalSignsMatch = text.match(/-\s*\*\*(?:Vital [Ss]igns|Vitals)\*\*\s*([\s\S]*?)(?=\n\n|\n\s*\n|\n\*\*|\n\s*-\s*[A-Z]|$)/i);
+    if (bulletVitalSignsMatch) {
+      // This could be the start of a list, but we need to look for the following bullet points
+      const followingText = text.substring(text.indexOf(bulletVitalSignsMatch[0]) + bulletVitalSignsMatch[0].length);
+      const bulletPoints = followingText.match(/(?:^|\n)\s*-\s*([^\n]*)/g);
+      if (bulletPoints) {
+        vitalSignsText = bulletPoints.join('\n');
+      }
+    } else {
+      // Try format 3: Look for a bold "**Vital signs**" header
+      const boldVitalSignsMatch = text.match(/\*\*(?:Vital [Ss]igns|Vitals)\*\*\s*([\s\S]*?)(?=\n\n|\n\s*\n|\n\*\*|\n\s*-\s*[A-Z]|$)/i);
+      if (boldVitalSignsMatch && boldVitalSignsMatch[1]) {
+        vitalSignsText = boldVitalSignsMatch[1].trim();
+      }
+    }
+  }
+  
+  // If we found vital signs text, process it
+  if (vitalSignsText) {
+    // Split into lines and process each one
+    const vitalSignLines = vitalSignsText.split('\n')
+      .filter(line => line.trim())
+      .map(line => line.trim().replace(/^[•\-*]\s+/, '').replace(/\*\*/g, ''));
+    
+    // Process each vital sign line
+    vitalSignLines.forEach(line => {
+      // Check for common vital sign patterns
+      const heartRateMatch = line.match(/(?:heart rate|hr|pulse):\s*(\d+)(?:\s*(\w+))?/i);
+      const respRateMatch = line.match(/(?:respiratory rate|resp rate|resp|rr):\s*(\d+)(?:\s*(\w+))?/i);
+      const bpMatch = line.match(/(?:blood pressure|bp):\s*(\d+)\/(\d+)(?:\s*(\w+))?/i);
+      const tempMatch = line.match(/(?:temperature|temp):\s*(\d+\.?\d*)(?:\s*(\w+|\°\w))?/i);
+      const o2SatMatch = line.match(/(?:oxygen saturation|o2 sat|o2|spo2|sat):\s*(\d+)(?:\s*(\w+|\%))?/i);
+      const consciousnessMatch = line.match(/(?:consciousness|mental status|alert):\s*(.+)/i);
+      const newsMatch = line.match(/(?:news2 score|news):\s*(.+)/i);
+      
+      // Handle specific vital sign formats
+      if (heartRateMatch) {
+        const [_, value, unit] = heartRateMatch;
+        presentationData.vitalSigns.push({
+          name: 'Heart Rate',
+          value,
+          unit: unit || 'bpm',
+          isAbnormal: parseInt(value) > 100 || parseInt(value) < 60
+        });
+      } else if (respRateMatch) {
+        const [_, value, unit] = respRateMatch;
+        presentationData.vitalSigns.push({
+          name: 'Respiratory Rate',
+          value,
+          unit: unit || 'breaths/min',
+          isAbnormal: parseInt(value) > 20 || parseInt(value) < 12
+        });
+      } else if (bpMatch) {
+        const [_, systolic, diastolic, unit] = bpMatch;
+        presentationData.vitalSigns.push({
+          name: 'Blood Pressure',
+          value: `${systolic}/${diastolic}`,
+          unit: unit || 'mmHg',
+          isAbnormal: parseInt(systolic) > 140 || parseInt(systolic) < 90 || parseInt(diastolic) > 90 || parseInt(diastolic) < 60
+        });
+      } else if (tempMatch) {
+        const [_, value, unit] = tempMatch;
+        presentationData.vitalSigns.push({
+          name: 'Temperature',
+          value,
+          unit: unit || '°C',
+          isAbnormal: parseFloat(value) > 37.5 || parseFloat(value) < 36
+        });
+      } else if (o2SatMatch) {
+        const [_, value, unit] = o2SatMatch;
+        presentationData.vitalSigns.push({
+          name: 'Oxygen Saturation',
+          value,
+          unit: unit || '%',
+          isAbnormal: parseInt(value) < 95
+        });
+      } else if (consciousnessMatch) {
+        const [_, value] = consciousnessMatch;
+        presentationData.vitalSigns.push({
+          name: 'Consciousness',
+          value,
+          unit: '',
+          isAbnormal: !value.toLowerCase().includes('alert') && !value.toLowerCase().includes('normal')
+        });
+      } else if (newsMatch) {
+        const [_, value] = newsMatch;
+        presentationData.vitalSigns.push({
+          name: 'NEWS2 Score',
+          value,
+          unit: '',
+          isAbnormal: !value.includes('0') && !value.includes('1')
+        });
+      } else {
+        // Check for "name: value" format
+        const separatorMatch = line.match(/(.*?):\s*(.*)/);
+        if (separatorMatch) {
+          let [_, name, value] = separatorMatch;
+          name = name.trim().replace(/\*\*/g, '');
+          value = value.trim();
+          
+          // Try to extract unit from the value
+          let unit = '';
+          
+          // Use regex to extract potential units
+          const unitMatch = value.match(/(\d+\.?\d*)\s*([a-zA-Z%°\/]+)?/);
+          if (unitMatch && unitMatch[2]) {
+            unit = unitMatch[2].trim();
+            value = unitMatch[1].trim();
+          }
+          
+          // Determine if abnormal based on name
+          let isAbnormal = false;
+          
+          // Determine if this is a well-known vital sign and set appropriate units and abnormal flags
+          if (name.toLowerCase().includes('heart') || name.toLowerCase().includes('pulse')) {
+            unit = unit || 'bpm';
+            isAbnormal = parseInt(value) > 100 || parseInt(value) < 60;
+          } else if (name.toLowerCase().includes('resp')) {
+            unit = unit || 'breaths/min';
+            isAbnormal = parseInt(value) > 20 || parseInt(value) < 12;
+          } else if (name.toLowerCase().includes('pressure') || name.toLowerCase().includes('bp')) {
+            unit = unit || 'mmHg';
+            // Check if it's a systolic/diastolic format
+            const bpValues = value.match(/(\d+)\/(\d+)/);
+            if (bpValues) {
+              isAbnormal = parseInt(bpValues[1]) > 140 || parseInt(bpValues[1]) < 90 || 
+                           parseInt(bpValues[2]) > 90 || parseInt(bpValues[2]) < 60;
+            }
+          } else if (name.toLowerCase().includes('temp')) {
+            unit = unit || '°C';
+            isAbnormal = parseFloat(value) > 37.5 || parseFloat(value) < 36;
+          } else if (name.toLowerCase().includes('oxygen') || name.toLowerCase().includes('o2') || name.toLowerCase().includes('sat')) {
+            unit = unit || '%';
+            isAbnormal = parseInt(value) < 95;
+          }
+          
+          presentationData.vitalSigns.push({
+            name,
+            value,
+            unit,
+            isAbnormal
+          });
+        } else if (line.length > 0) {
+          // If it doesn't match any pattern but has content, add as an "Other" vital sign
+          presentationData.vitalSigns.push({
+            name: 'Other',
+            value: line,
+            unit: '',
+            isAbnormal: false
+          });
+        }
+      }
+    });
+  }
+  
+  // Extract physical examination findings
+  const physicalExamMatch = text.match(/(?:\*\*)?(?:Physical [Ee]xamination|Physical [Ee]xam)(?:\*\*)?:?\s*([\s\S]*?)(?=\n\n|\n\s*\n|\n\*\*|\n## |$)/i);
+  if (physicalExamMatch && physicalExamMatch[1]) {
+    const physicalExamText = physicalExamMatch[1].trim().replace(/\*\*/g, '');
+    
+    // Check if there's a direct list of systems and findings
+    if (physicalExamText.includes(':') && physicalExamText.includes('\n')) {
+      // Try to identify systems and findings
+      const systemLines = physicalExamText.split('\n')
+        .filter(line => line.trim())
+        .map(line => line.trim().replace(/^[•\-*]\s+/, ''));
+      
+      let currentSystem = 'General';
+      
+      systemLines.forEach(line => {
+        // Check if this line defines a new system
+        const systemMatch = line.match(/^(.*?):\s*(.*)/);
+        if (systemMatch) {
+          const [_, systemName, findings] = systemMatch;
+          
+          // Update current system
+          currentSystem = systemName.trim();
+          
+          // If there are findings on this line, add them
+          if (findings && findings.trim()) {
+            presentationData.physicalExam.push({
+              system: currentSystem,
+              findings: findings.trim(),
+              isAbnormal: isLikelyAbnormal(findings.trim())
+            });
+          }
+        } else {
+          // This is a continuation of findings for the current system
+          presentationData.physicalExam.push({
+            system: currentSystem,
+            findings: line,
+            isAbnormal: isLikelyAbnormal(line)
+          });
+        }
+      });
+    } else {
+      // Alternative format: Look for a list of physical exam findings without explicit system headers
+      const examLines = physicalExamText.split('\n')
+        .filter(line => line.trim())
+        .map(line => line.trim().replace(/^[•\-*]\s+/, ''));
+      
+      examLines.forEach(line => {
+        // Try to infer system from the line content
+        let system = 'General';
+        
+        if (line.toLowerCase().includes('respiratory') || 
+            line.toLowerCase().includes('lung') || 
+            line.toLowerCase().includes('breath') ||
+            line.toLowerCase().includes('chest')) {
+          system = 'Respiratory';
+        } else if (line.toLowerCase().includes('cardiovascular') || 
+                  line.toLowerCase().includes('heart') || 
+                  line.toLowerCase().includes('cardiac') ||
+                  line.toLowerCase().includes('pulse')) {
+          system = 'Cardiovascular';
+        } else if (line.toLowerCase().includes('neuro') || 
+                  line.toLowerCase().includes('mental status') ||
+                  line.toLowerCase().includes('gcs') ||
+                  line.toLowerCase().includes('consciousness')) {
+          system = 'Neurological';
+        } else if (line.toLowerCase().includes('abdom') || 
+                  line.toLowerCase().includes('bowel') || 
+                  line.toLowerCase().includes('gi')) {
+          system = 'Abdominal';
+        } else if (line.toLowerCase().includes('skin') || 
+                  line.toLowerCase().includes('integumentary')) {
+          system = 'Skin';
+        } else if (line.toLowerCase().includes('extremity') || 
+                  line.toLowerCase().includes('musculoskeletal') || 
+                  line.toLowerCase().includes('msk')) {
+          system = 'Musculoskeletal';
+        }
+        
+        presentationData.physicalExam.push({
+          system,
+          findings: line,
+          isAbnormal: isLikelyAbnormal(line)
+        });
+      });
+    }
+  } else {
+    // Try to find physical exam findings in bullet points without a formal section
+    const examBulletPoints = text.match(/(?:^|\n)\s*-\s*(?:General|Respiratory|Cardiovascular|Abdominal|Neurological|Skin|HEENT):[^\n]+/g);
+    if (examBulletPoints) {
+      examBulletPoints.forEach(line => {
+        const systemMatch = line.match(/-\s*(.*?):\s*(.*)/);
+        if (systemMatch) {
+          const [_, system, findings] = systemMatch;
+          presentationData.physicalExam.push({
+            system: system.trim(),
+            findings: findings.trim(),
+            isAbnormal: isLikelyAbnormal(findings.trim())
+          });
+        }
+      });
+    }
+  }
+  
+  // Extract initial assessment
+  const initialAssessmentMatch = text.match(/(?:\*\*)?(?:Initial [Aa]ssessment|Assessment)(?:\*\*)?:?\s*([\s\S]*?)(?=\n\n|\n\s*\n|\n\*\*|\n## |$)/i);
+  if (initialAssessmentMatch && initialAssessmentMatch[1]) {
+    presentationData.initialAssessment = initialAssessmentMatch[1].trim();
+  }
+  
+  // Extract diagnostic studies (labs, imaging, etc.)
+  const diagnosticStudiesMatch = text.match(/(?:\*\*)?(?:Diagnostic [Ss]tudies|Laboratory|Labs|Imaging)(?:\*\*)?:?\s*([\s\S]*?)(?=\n\n|\n\s*\n|\n\*\*|\n## |$)/i);
+  if (diagnosticStudiesMatch && diagnosticStudiesMatch[1]) {
+    const diagnosticText = diagnosticStudiesMatch[1].trim().replace(/\*\*/g, '');
+    
+    // Check if it's in a list format
+    if (diagnosticText.includes('\n')) {
+      const diagnosticLines = diagnosticText.split('\n')
+        .filter(line => line.trim())
+        .map(line => line.trim().replace(/^[•\-*]\s+/, ''));
+      
+      diagnosticLines.forEach(line => {
+        const resultMatch = line.match(/(.*?):\s*(.*)/);
+        if (resultMatch) {
+          const [_, testName, result] = resultMatch;
+          
+          // Try to determine normal range and if abnormal
+          let normalRange = '';
+          let isAbnormal = false;
+          
+          // Look for patterns like "Result (Normal: X-Y)" or "Result (elevated)"
+          const normalRangeMatch = result.match(/(.*?)\s*\((?:normal(?:ly)?:?\s*(.*?)|(?:elevated|abnormal|high|low))\)/i);
+          if (normalRangeMatch) {
+            // Has explicit normal range or abnormality indicator
+            if (normalRangeMatch[2]) {
+              normalRange = normalRangeMatch[2].trim();
+            }
+            
+            // If it says elevated/abnormal/high/low, mark as abnormal
+            if (result.match(/\b(?:elevated|abnormal|high|low)\b/i)) {
+              isAbnormal = true;
+            }
+          } else {
+            // Check for common lab tests and set abnormal based on values
+            const testNameLower = testName.toLowerCase();
+            
+            if (testNameLower.includes('wbc') || testNameLower.includes('white blood cell')) {
+              const numValue = parseFloat(result.replace(/[^\d.]/g, ''));
+              normalRange = '4.5-11.0 × 10^9/L';
+              isAbnormal = numValue < 4.5 || numValue > 11.0;
+            } else if (testNameLower.includes('hgb') || testNameLower.includes('hemoglobin')) {
+              const numValue = parseFloat(result.replace(/[^\d.]/g, ''));
+              normalRange = '13.5-17.5 g/dL (male), 12.0-15.5 g/dL (female)';
+              isAbnormal = numValue < 12.0 || numValue > 17.5;
+            } else if (testNameLower.includes('oxygen') || testNameLower.includes('o2')) {
+              const numValue = parseFloat(result.replace(/[^\d.]/g, ''));
+              normalRange = '95-100%';
+              isAbnormal = numValue < 95;
+            } else if (testNameLower.includes('glucose')) {
+              const numValue = parseFloat(result.replace(/[^\d.]/g, ''));
+              normalRange = '70-100 mg/dL (fasting)';
+              isAbnormal = numValue < 70 || numValue > 140;
+            } else if (testNameLower.includes('potassium') || testNameLower.includes('k+')) {
+              const numValue = parseFloat(result.replace(/[^\d.]/g, ''));
+              normalRange = '3.5-5.0 mEq/L';
+              isAbnormal = numValue < 3.5 || numValue > 5.0;
+            }
+            
+            // For all other tests, check if result contains abnormal keywords
+            if (!isAbnormal) {
+              isAbnormal = isLikelyAbnormal(result);
+            }
+          }
+          
+          presentationData.diagnosticStudies.push({
+            name: testName.trim(),
+            result: result.trim(),
+            normalRange,
+            isAbnormal,
+            date: new Date().toISOString().split('T')[0] // Use current date
+          });
+        } else {
+          // Handle lines without the test: result format
+          const testParts = line.split(' - ');
+          if (testParts.length > 1) {
+            // Format: "Test Name - Result"
+            presentationData.diagnosticStudies.push({
+              name: testParts[0].trim(),
+              result: testParts.slice(1).join(' - ').trim(),
+              normalRange: '',
+              isAbnormal: isLikelyAbnormal(testParts.slice(1).join(' - ')),
+              date: new Date().toISOString().split('T')[0]
+            });
+          } else {
+            // Generic finding
+            presentationData.diagnosticStudies.push({
+              name: 'Finding',
+              result: line,
+              normalRange: '',
+              isAbnormal: isLikelyAbnormal(line),
+              date: new Date().toISOString().split('T')[0]
+            });
+          }
+        }
+      });
+    } else if (diagnosticText.length > 0) {
+      // Just one line, treat as general finding
+      presentationData.diagnosticStudies.push({
+        name: 'Finding',
+        result: diagnosticText,
+        normalRange: '',
+        isAbnormal: isLikelyAbnormal(diagnosticText),
+        date: new Date().toISOString().split('T')[0]
+      });
+    }
+  }
+  
+  return presentationData;
+}
+
+/**
+ * Helper function to determine if a finding is likely abnormal based on keywords
+ */
+function isLikelyAbnormal(text: string): boolean {
+  const abnormalKeywords = [
+    'abnormal', 'elevated', 'increased', 'decreased', 'reduced', 'impaired',
+    'distress', 'pain', 'tender', 'swelling', 'edema', 'redness', 'pale',
+    'cyanosis', 'jaundice', 'tachycardia', 'bradycardia', 'tachypnea',
+    'hypotension', 'hypertension', 'fever', 'hypothermia', 'dyspnea',
+    'irregular', 'murmur', 'rales', 'crackles', 'wheezing', 'rhonchi',
+    'diminished', 'absent', 'delayed', 'positive', 'negative', 'deficit',
+    'weakness', 'paralysis', 'altered', 'confusion', 'disorientation'
+  ];
+  
+  return abnormalKeywords.some(keyword => 
+    text.toLowerCase().includes(keyword.toLowerCase())
+  );
 } 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { DynamicSection, parseContentToDynamicSections, classifyContent, enhancedParsePatientInfoSection } from '@/utils/contentClassifier';
+import { DynamicSection, parseContentToDynamicSections, classifyContent, enhancedParsePatientInfoSection, parsePresentationData } from '@/utils/contentClassifier';
 
 // Define structured case data interface
 interface StructuredCaseData {
@@ -126,15 +126,9 @@ export function useAICase() {
       const presentationSections = parseContentToDynamicSections(presentationMatch[1]);
       structuredData.dynamicSections.presentation = presentationSections;
       
-      // Extract vital signs
-      const vitalSignsMatch = presentationMatch[1].match(/(?:Vital [Ss]igns|Vitals).*?:([\s\S]*?)(?=\n\n|\n- [^\n]*:|$)/);
-      if (vitalSignsMatch) {
-        const vitalSignLines = vitalSignsMatch[1].split('\n').filter(line => line.trim().startsWith('-'));
-        structuredData.presentation.vitalSigns = vitalSignLines.map(line => {
-          const [name, value] = line.replace(/^-\s*/, '').split(':').map(s => s.trim());
-          return { name, value, unit: '', isAbnormal: false };
-        });
-      }
+      // Use the enhanced presentation data parser
+      const parsedPresentationData = parsePresentationData(presentationMatch[1]);
+      structuredData.presentation = { ...parsedPresentationData };
     }
 
     // Extract treatment information

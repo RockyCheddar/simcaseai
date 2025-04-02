@@ -40,6 +40,7 @@ interface PresentationData {
   physicalExam: PhysicalExamFinding[];
   diagnosticStudies: DiagnosticStudy[];
   doctorNotes?: DoctorNote[];
+  initialAssessment?: string;
 }
 
 interface PresentationTabProps {
@@ -48,7 +49,7 @@ interface PresentationTabProps {
 }
 
 function PresentationTab({ presentationData, dynamicSections = [] }: PresentationTabProps) {
-  const { vitalSigns, physicalExam, diagnosticStudies, doctorNotes } = presentationData;
+  const { vitalSigns, physicalExam, diagnosticStudies, doctorNotes, initialAssessment } = presentationData;
   
   return (
     <div className="space-y-6">
@@ -59,10 +60,10 @@ function PresentationTab({ presentationData, dynamicSections = [] }: Presentatio
           <p className="mt-1 max-w-2xl text-sm text-gray-500">Patient vital signs at presentation</p>
         </div>
         <div className="border-t border-gray-200 px-4 py-5 sm:p-6">
-          <dl className="mt-2 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
-            {vitalSigns.map((vital) => (
+          <dl className="mt-2 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {vitalSigns.map((vital, index) => (
               <div 
-                key={vital.name} 
+                key={`${vital.name}-${index}`} 
                 className={`overflow-hidden rounded-lg bg-white px-4 py-5 shadow-sm sm:p-6 ${
                   vital.isAbnormal ? 'ring-2 ring-red-500' : ''
                 }`}
@@ -70,7 +71,7 @@ function PresentationTab({ presentationData, dynamicSections = [] }: Presentatio
                 <dt className="truncate text-sm font-medium text-gray-500">{vital.name}</dt>
                 <dd className="mt-1 text-3xl font-semibold tracking-tight text-gray-900">
                   {vital.value}
-                  <span className="ml-1 text-sm font-normal text-gray-500">{vital.unit}</span>
+                  {vital.unit && <span className="ml-1 text-sm font-normal text-gray-500">{vital.unit}</span>}
                 </dd>
                 {vital.normalRange && (
                   <p className="mt-1 text-xs text-gray-500">Normal: {vital.normalRange}</p>
@@ -102,6 +103,19 @@ function PresentationTab({ presentationData, dynamicSections = [] }: Presentatio
           </dl>
         </div>
       </div>
+
+      {/* Initial Assessment Section (if available) */}
+      {initialAssessment && (
+        <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
+          <div className="px-4 py-5 sm:px-6">
+            <h3 className="text-lg font-semibold text-gray-900">Initial Assessment</h3>
+            <p className="mt-1 max-w-2xl text-sm text-gray-500">Clinician's initial impression</p>
+          </div>
+          <div className="border-t border-gray-200 px-4 py-5 sm:p-6">
+            <p className="text-sm text-gray-900 whitespace-pre-line">{initialAssessment}</p>
+          </div>
+        </div>
+      )}
 
       {/* Diagnostic Studies Section */}
       <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
@@ -182,10 +196,19 @@ function PresentationTab({ presentationData, dynamicSections = [] }: Presentatio
         </div>
       )}
 
-      {/* Dynamic Sections */}
-      {dynamicSections.length > 0 && (
-        <DynamicContentSection sections={dynamicSections} />
-      )}
+      {/* Additional Information Section */}
+      <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
+        <div className="px-4 py-5 sm:px-6">
+          <h3 className="text-lg font-semibold text-gray-900">Additional Information</h3>
+          <p className="mt-1 max-w-2xl text-sm text-gray-500">Generated content from case analysis</p>
+        </div>
+        <div className="border-t border-gray-200">
+          {/* Dynamic Sections */}
+          {dynamicSections.length > 0 && (
+            <DynamicContentSection sections={dynamicSections} />
+          )}
+        </div>
+      </div>
     </div>
   );
 }
