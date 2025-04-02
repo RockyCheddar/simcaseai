@@ -6,10 +6,69 @@ import { CaseParameters } from '@/types/case';
 import MarkdownPreview from '@/components/MarkdownPreview';
 import AIGenerationLoader from '@/components/AIGenerationLoader';
 import useAICase from '@/hooks/useAICase';
+import { DynamicSection } from '@/utils/contentClassifier';
+
+// Define StructuredCaseData interface to match what's returned by useAICase
+interface StructuredCaseData {
+  title: string;
+  rawText: string;
+  overview: {
+    caseSummary?: string;
+    status?: string;
+    createdDate?: string;
+    updatedDate?: string;
+    clinicalSetting?: string;
+    learningObjectives?: string[];
+  };
+  patientInfo: {
+    name?: string;
+    age?: string;
+    gender?: string;
+    occupation?: string;
+    chiefComplaint?: string;
+    briefHistory?: string;
+    conditions?: string[];
+    medications?: { name: string; dosage: string }[];
+    allergies?: { allergen: string; reaction: string }[];
+    livingSituation?: string;
+    socialContext?: string;
+    [key: string]: any;
+  };
+  presentation: {
+    vitalSigns?: any[];
+    physicalExam?: any[];
+    diagnosticStudies?: any[];
+    doctorNotes?: any[];
+    [key: string]: any;
+  };
+  treatment: {
+    initialManagement?: any[];
+    treatmentPlan?: any;
+    progressionScenarios?: any[];
+    clinicalCourse?: any;
+    [key: string]: any;
+  };
+  simulation: {
+    nursingCompetencies?: any[];
+    questionsToConsider?: any[];
+    gradingRubric?: any[];
+    skillsAssessment?: any[];
+    debriefingPoints?: string[];
+    teachingPlan?: string;
+    [key: string]: any;
+  };
+  dynamicSections: {
+    overview: DynamicSection[];
+    'patient-info': DynamicSection[];
+    presentation: DynamicSection[];
+    treatment: DynamicSection[];
+    simulation: DynamicSection[];
+  };
+}
 
 export default function TestCaseGenerationPage() {
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedCase, setGeneratedCase] = useState<{ text: string; title: string } | null>(null);
+  const [generatedCase, setGeneratedCase] = useState<StructuredCaseData | null>(null);
   
   // Use our AI hook
   const { generateCase } = useAICase();
@@ -129,7 +188,7 @@ export default function TestCaseGenerationPage() {
       ) : (
         <div>
           <MarkdownPreview 
-            markdown={generatedCase.text} 
+            markdown={generatedCase.rawText} 
             title={generatedCase.title}
           />
           
