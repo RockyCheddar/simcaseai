@@ -9,6 +9,7 @@ import CaseTabs from '@/components/CaseTabs';
 import MarkdownPreview from '@/components/MarkdownPreview';
 import AIGenerationLoader from '@/components/AIGenerationLoader';
 import { CaseParameters, LearningObjective } from '@/types/case';
+import { DynamicSection } from '@/utils/contentClassifier';
 
 // Mock case data
 const sampleCase = {
@@ -351,6 +352,64 @@ interface LabResults {
   [key: string]: string;
 }
 
+// Define StructuredCaseData interface 
+interface StructuredCaseData {
+  title: string;
+  rawText: string;
+  overview: {
+    caseSummary?: string;
+    status?: string;
+    createdDate?: string;
+    updatedDate?: string;
+    clinicalSetting?: string;
+    learningObjectives?: string[];
+  };
+  patientInfo: {
+    name?: string;
+    age?: string;
+    gender?: string;
+    occupation?: string;
+    chiefComplaint?: string;
+    briefHistory?: string;
+    conditions?: string[];
+    medications?: { name: string; dosage: string }[];
+    allergies?: { allergen: string; reaction: string }[];
+    livingSituation?: string;
+    socialContext?: string;
+    [key: string]: any;
+  };
+  presentation: {
+    vitalSigns?: any[];
+    physicalExam?: any[];
+    diagnosticStudies?: any[];
+    doctorNotes?: any[];
+    [key: string]: any;
+  };
+  treatment: {
+    initialManagement?: any[];
+    treatmentPlan?: any;
+    progressionScenarios?: any[];
+    clinicalCourse?: any;
+    [key: string]: any;
+  };
+  simulation: {
+    nursingCompetencies?: any[];
+    questionsToConsider?: any[];
+    gradingRubric?: any[];
+    skillsAssessment?: any[];
+    debriefingPoints?: string[];
+    teachingPlan?: string;
+    [key: string]: any;
+  };
+  dynamicSections: {
+    overview: DynamicSection[];
+    'patient-info': DynamicSection[];
+    presentation: DynamicSection[];
+    treatment: DynamicSection[];
+    simulation: DynamicSection[];
+  };
+}
+
 // Add EditableVitalSignCard component
 function EditableVitalSignCard({ 
   label, 
@@ -566,171 +625,95 @@ export default function CaseDetailPage({ params }: { params: { id: string } }) {
         
         <div className="mt-6">
           <Tab.Group>
-            <CaseTabs tabs={[
-              { name: 'Overview', current: true },
-              { name: 'Patient Info', current: false },
-              { name: 'Presentation', current: false },
-              { name: 'Treatment', current: false },
-              { name: 'Simulation Learning', current: false },
-            ]}>
-              <Tab.Panel>
-                {regeneratingTab === 'Overview' ? (
-                  <AIGenerationLoader mode="tab" tabName="Overview" />
-                ) : (
-                  <div className="bg-white p-6 rounded-lg shadow">
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-lg font-medium">Overview</h2>
-                      {renderRegenerateButton('Overview')}
-                    </div>
-                    <div className="mt-4 prose max-w-none">
-                      <MarkdownPreview markdown={caseData.text} title={caseData.title} />
-                    </div>
-                  </div>
-                )}
-              </Tab.Panel>
-              
-              <Tab.Panel>
-                {regeneratingTab === 'Patient Info' ? (
-                  <AIGenerationLoader mode="tab" tabName="Patient Info" />
-                ) : (
-                  <div className="bg-white p-6 rounded-lg shadow">
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-lg font-medium">Patient Info</h2>
-                      {renderRegenerateButton('Patient Info')}
-                    </div>
-                    <div className="mt-4">
-                      {caseData.demographics && (
-                        <div className="space-y-4">
-                          <h3 className="text-md font-medium text-gray-900">Demographics</h3>
-                          <div className="grid grid-cols-2 gap-4">
-                            {Object.entries(caseData.demographics).map(([key, value]) => (
-                              <div key={key}>
-                                <span className="text-sm font-medium text-gray-500">{key}:</span>
-                                <p className="text-gray-800">{value}</p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </Tab.Panel>
-              
-              <Tab.Panel>
-                {regeneratingTab === 'Presentation' ? (
-                  <AIGenerationLoader mode="tab" tabName="Presentation" />
-                ) : (
-                  <div className="space-y-6">
-                    <div className="bg-white p-6 rounded-lg shadow">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <h2 className="text-lg font-medium">Vital Signs</h2>
-                          {renderSectionRegenerateButton('vitalSigns')}
-                        </div>
-                        {renderRegenerateButton('Presentation')}
-                      </div>
-                      
-                      {regeneratingSection === 'vitalSigns' ? (
-                        <div className="mt-6">
-                          <AIGenerationLoader mode="section" sectionName="vitalSigns" />
-                        </div>
-                      ) : (
-                        <div className="mt-4">
-                          {caseData.recommendedVitalSigns && (
-                            <div className="grid grid-cols-2 gap-4">
-                              {Object.entries(caseData.recommendedVitalSigns).map(([key, value]) => (
-                                <div key={key}>
-                                  <span className="text-sm font-medium text-gray-500">{key}:</span>
-                                  <p className="text-gray-800">
-                                    {typeof value === 'object' && 'min' in value && 'max' in value
-                                      ? `${value.min}-${value.max}`
-                                      : String(value)}
-                                  </p>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="bg-white p-6 rounded-lg shadow">
-                      <div className="flex items-center">
-                        <h2 className="text-lg font-medium">Physical Examination</h2>
-                        {renderSectionRegenerateButton('physicalExam')}
-                      </div>
-                      
-                      {regeneratingSection === 'physicalExam' ? (
-                        <div className="mt-6">
-                          <AIGenerationLoader mode="section" sectionName="physicalExam" />
-                        </div>
-                      ) : (
-                        <div className="mt-4">
-                          {caseData.complexity?.abnormalFindings && (
-                            <div className="space-y-2">
-                              {caseData.complexity.abnormalFindings.map((finding: string, index: number) => (
-                                <p key={index}>{finding}</p>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </Tab.Panel>
-              
-              <Tab.Panel>
-                {regeneratingTab === 'Treatment' ? (
-                  <AIGenerationLoader mode="tab" tabName="Treatment" />
-                ) : (
-                  <div className="bg-white p-6 rounded-lg shadow">
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-lg font-medium">Treatment</h2>
-                      {renderRegenerateButton('Treatment')}
-                    </div>
-                    <div className="mt-4">
-                      {caseData.clinicalContext?.availableResources && (
-                        <div className="space-y-4">
-                          <h3 className="text-md font-medium text-gray-900">Available Resources</h3>
-                          <ul className="list-disc pl-5">
-                            {caseData.clinicalContext.availableResources.map((resource: string, index: number) => (
-                              <li key={index}>{resource}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </Tab.Panel>
-              
-              <Tab.Panel>
-                {regeneratingTab === 'Simulation Learning' ? (
-                  <AIGenerationLoader mode="tab" tabName="Simulation Learning" />
-                ) : (
-                  <div className="bg-white p-6 rounded-lg shadow">
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-lg font-medium">Simulation Learning</h2>
-                      {renderRegenerateButton('Simulation Learning')}
-                    </div>
-                    <div className="mt-4">
-                      {caseData.learningObjectives && (
-                        <div className="space-y-4">
-                          <h3 className="text-md font-medium text-gray-900">Learning Objectives</h3>
-                          <ul className="list-disc pl-5">
-                            {caseData.learningObjectives.map((objective: any, index: number) => (
-                              <li key={index}>{objective.text}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </Tab.Panel>
-            </CaseTabs>
+            {caseData ? (
+              <CaseTabs 
+                tabs={[
+                  { name: 'Overview', current: true },
+                  { name: 'Patient Info', current: false },
+                  { name: 'Presentation', current: false },
+                  { name: 'Treatment', current: false },
+                  { name: 'Simulation Learning', current: false },
+                ]}
+                caseData={{
+                  title: caseData.title,
+                  rawText: caseData.text || '',
+                  overview: {
+                    caseSummary: caseData.text?.substring(0, 300) || '',
+                    status: 'Complete',
+                    createdDate: new Date().toISOString(),
+                    updatedDate: new Date().toISOString(),
+                    clinicalSetting: caseData.demographics?.clinicalSetting as string || '',
+                    learningObjectives: Array.isArray(caseData.learningObjectives) 
+                      ? caseData.learningObjectives.map((obj: any) => obj.text) 
+                      : [],
+                  },
+                  patientInfo: {
+                    name: caseData.demographics?.name as string || '',
+                    age: caseData.demographics?.age as string || '',
+                    gender: caseData.demographics?.gender as string || '',
+                    occupation: caseData.demographics?.occupation as string || '',
+                    chiefComplaint: '',
+                    briefHistory: '',
+                    conditions: [],
+                    medications: [],
+                    allergies: [],
+                    socialContext: caseData.demographics?.socialContext as string || '',
+                  },
+                  presentation: {
+                    vitalSigns: Object.entries(caseData.recommendedVitalSigns || {}).map(([name, value]) => ({
+                      name,
+                      value: typeof value === 'object' && 'min' in value ? `${value.min}-${value.max}` : String(value),
+                      unit: name === 'heartRate' ? 'bpm' : 
+                           name === 'respiratoryRate' ? '/min' : 
+                           name === 'bloodPressure' ? 'mmHg' : 
+                           name === 'temperature' ? '°C' : 
+                           name === 'oxygenSaturation' ? '%' : '',
+                      isAbnormal: false
+                    })),
+                    physicalExam: caseData.complexity?.abnormalFindings?.map((finding: string) => ({
+                      system: 'General',
+                      findings: finding,
+                      isAbnormal: true
+                    })) || [],
+                    diagnosticStudies: [],
+                    doctorNotes: [],
+                  },
+                  treatment: {
+                    initialManagement: [],
+                    treatmentPlan: {
+                      medications: [],
+                      procedures: [],
+                      monitoring: [],
+                      consults: [],
+                      patientEducation: []
+                    },
+                    progressionScenarios: [],
+                    clinicalCourse: {
+                      outcomes: []
+                    }
+                  },
+                  simulation: {
+                    nursingCompetencies: [],
+                    questionsToConsider: [],
+                    gradingRubric: [],
+                    skillsAssessment: [],
+                    debriefingPoints: [],
+                    teachingPlan: ''
+                  },
+                  dynamicSections: {
+                    overview: [],
+                    'patient-info': [],
+                    presentation: [],
+                    treatment: [],
+                    simulation: []
+                  }
+                }}
+              >
+                {/* We can keep this empty since our updated CaseTabs component handles children internally */}
+              </CaseTabs>
+            ) : (
+              <div>Loading case data...</div>
+            )}
           </Tab.Group>
         </div>
       </div>
