@@ -388,96 +388,75 @@ export function parsePresentationData(text: string): Record<string, any> {
   // --- Lab Results Parsing --- 
   // Enhanced parser for different lab line formats
   const parseLabLine = (line: string): DiagnosticStudy | null => {
-    // Format 1: Test: Value [Units] [Reference: Range] [(Flag)] 
-    // Format 2: Test: Value [(Flag)] [Reference: Range] [Units]
-    // Format 3: Test: Value [Units] [(Flag)] [Reference: Range]
-    // Handles optional units, flags, and reference ranges in various orders after the value.
-    const labPattern = /^(?:[•\-*]\s*)?([^:]+?)\s*:\s*(\d+\.?\d*\s*[^\s\[\(]*)(.*)/i;
+    // Try Format: Test: Value [Units] [Reference Range] [(Flag)] or variations
+    // Example: WBC: 18.5 x 10^9/L [Reference: 4.0-11.0] (High)
+    // Example: Hemoglobin: 14.8 g/dL [Reference: 13.5-17.5]
+    // Example: Neutrophils: 82% [40-75%] (High)
+    const labPattern = /^(?:[•\-*]\s*)?([^:]+?)\s*:\s*(.+)/i;
     const match = line.match(labPattern);
 
     if (match) {
-        let [_, name, valuePart, remainder] = match;
+        let [_, name, remaining] = match;
         name = name.trim();
-        valuePart = valuePart.trim(); 
-        remainder = remainder.trim();
+        remaining = remaining.trim();
 
-        let result = valuePart;
+        let valuePart = '';
         let normalRange = '';
         let abnormalFlag = '';
         let units = '';
 
-        // Extract units if they are directly after the numeric value
-        const valueUnitMatch = valuePart.match(/^(\d+\.?\d*)\s*([^\d\s].*)$/);
-        if (valueUnitMatch) {
-            units = valueUnitMatch[2].trim();
-            result = valueUnitMatch[0]; // Keep units with result for display
-        } else {
-            result = valuePart;
-        }
-
         // Extract Flag (e.g., (High), (Low))
-        const flagMatch = remainder.match(/\((High|Low|Abnormal|Elevated|Decreased)\)/i);
+        const flagMatch = remaining.match(/\((High|Low|Abnormal|Elevated|Decreased)\)$/i);
         if (flagMatch) {
             abnormalFlag = flagMatch[1];
-            remainder = remainder.replace(flagMatch[0], '').trim();
-        }
-
-        // Extract Reference Range (e.g., [Reference: 1.0-2.0], [1.0-2.0])
-        const refMatch = remainder.match(/\[(?:Reference\s*:\s*)?([^\].]+)\]/i);
-        if (refMatch) {
-            normalRange = refMatch[1].trim();
-            remainder = remainder.replace(refMatch[0], '').trim();
+            remaining = remaining.replace(flagMatch[0], '').trim();
         }
         
-        // Extract Units if they are somewhere in the remainder
-        if (!units && remainder.length > 0) {
-            // Assume the first part of the remainder might be units if it doesn't look like range/flag
-            const possibleUnit = remainder.split(/\s+|\[|\(/)[0];
-            if (possibleUnit.match(/^[a-zA-Z%°\/×^]+[\da-zA-Z%°\/×^]*$/)) { // Plausible unit pattern
-               units = possibleUnit;
-               result += ` ${units}`; // Append units to result string
-            }
+        // Extract Reference Range (e.g., [Reference: 1.0-2.0], [1.0-11.0], 40-75%)
+        // Try bracket format first
+        let refMatch = remaining.match(/\[(?:Reference\s*:\s*)?([^\].]+)\]$/i);
+        if (refMatch) {
+            normalRange = refMatch[1].trim();
+            remaining = remaining.replace(refMatch[0], '').trim();
+        } else {
+             // Try simple range format at the end (e.g., 4.5-5.9)
+             refMatch = remaining.match(/((?:\d+\.?\d*\s*-\s*\d+\.?\d*\s*%?))$/i);
+             if (refMatch) {
+                normalRange = refMatch[1].trim();
+                remaining = remaining.replace(refMatch[0], '').trim();
+             }
         }
 
-        const isAbnormal = /high|low|abnormal|elevated|decreased/i.test(abnormalFlag);
+        // Whatever is left is likely the value + units
+        valuePart = remaining.trim();
+        
+        let result = valuePart; // Use the full remaining part as the result initially
+        let valueNumericStr = valuePart.match(/^(\d+\.?\d*)/)?.[1] || '';
 
-        // Attempt to infer abnormality if flag is missing but range is present
-        let inferredAbnormal = isAbnormal;
-        if (!isAbnormal && normalRange) {
-            const valueNumeric = parseFloat(valuePart);
+        // Attempt to infer abnormality if flag is missing but range and value are present
+        let isAbnormal = /high|low|abnormal|elevated|decreased/i.test(abnormalFlag);
+        if (!isAbnormal && normalRange && valueNumericStr) {
+            const valueNumeric = parseFloat(valueNumericStr);
             const rangeMatch = normalRange.match(/(\d+\.?\d*)\s*-\s*(\d+\.?\d*)/);
             if (!isNaN(valueNumeric) && rangeMatch) {
                 const lowerBound = parseFloat(rangeMatch[1]);
                 const upperBound = parseFloat(rangeMatch[2]);
                 if (!isNaN(lowerBound) && !isNaN(upperBound)) {
-                    inferredAbnormal = valueNumeric < lowerBound || valueNumeric > upperBound;
+                    isAbnormal = valueNumeric < lowerBound || valueNumeric > upperBound;
                 }
             }
         }
 
         return {
             name: name,
-            result: result, // Includes value and units if found
+            result: result + (abnormalFlag ? ` (${abnormalFlag})` : ''), // Display flag with result
             normalRange: normalRange,
-            isAbnormal: isAbnormal || inferredAbnormal,
-            date: new Date().toISOString().split('T')[0]
-        };
-    }
-    
-    // Handle simple "Test: Result" lines if complex pattern fails
-    const simpleMatch = line.match(/^(?:[•\-*]\s*)?([^:]+?)\s*:\s*(.+)/);
-    if (simpleMatch) {
-        const [_, name, result] = simpleMatch;
-         return {
-            name: name.trim(),
-            result: result.trim(),
-            normalRange: '',
-            isAbnormal: isLikelyAbnormal(result.trim()),
+            isAbnormal: isAbnormal,
             date: new Date().toISOString().split('T')[0]
         };
     }
 
-    return null;
+    return null; // Return null if no match at all
 };
 
   // Look for a laboratory results section more broadly
@@ -517,52 +496,103 @@ export function parsePresentationData(text: string): Record<string, any> {
   }
   
   // --- Physical Examination Parsing --- 
-  // (Keep existing physical exam parsing logic here)
-  // ... existing code ...
-  
-  // --- Initial Assessment Parsing --- 
-  // (Keep existing initial assessment parsing logic here)
-  // ... existing code ...
-  
-  // --- Fallback Diagnostic Studies Parsing --- 
-  // This can catch imaging results or other diagnostics not formatted like labs
-  const diagnosticStudiesMatch = text.match(/(?:\*\*)?(?:Diagnostic [Ss]tudies|Imaging Results?)(?:\*\*)?:?\s*([\s\S]*?)(?=\n\n|\n\s*\n|\n\*\*|\n## |$)/i);
-  if (diagnosticStudiesMatch && diagnosticStudiesMatch[1]) {
-      const diagnosticText = diagnosticStudiesMatch[1].trim().replace(/\*\*/g, '');
-      const diagLines = diagnosticText.split('\n')
-          .filter(line => line.trim() && line.trim().length > 3)
-          .map(line => line.trim().replace(/^[•\-*]\s+/, ''));
-          
-      diagLines.forEach(line => {
-          // Avoid adding lines that look like lab results already parsed
-          if (parseLabLine(line)) return; 
-          
-          const resultMatch = line.match(/(.*?):\s*(.*)/);
-          if (resultMatch) {
-              const [_, testName, result] = resultMatch;
-              if (!presentationData.diagnosticStudies.some((existing: DiagnosticStudy) => existing.name === testName.trim())) {
-                 presentationData.diagnosticStudies.push({
-                      name: testName.trim(),
-                      result: result.trim(),
-                      normalRange: '',
-                      isAbnormal: isLikelyAbnormal(result.trim()),
-                      date: new Date().toISOString().split('T')[0]
-                  });
-              }
-          } else if (line.length > 10 && !presentationData.diagnosticStudies.some((existing: DiagnosticStudy) => existing.result === line)) { 
-              // Add non-colon lines as general findings if substantial
-              presentationData.diagnosticStudies.push({
-                  name: 'Finding', 
-                  result: line, 
-                  normalRange: '', 
-                  isAbnormal: isLikelyAbnormal(line), 
-                  date: new Date().toISOString().split('T')[0]
-              });
-          }
-      });
+  // Ensure this block exists and section matching is robust
+  const physicalExamMatch = text.match(/(?:\*\*)?(?:Physical [Ee]xamination|Physical [Ee]xam)(?:\*\*)?:?\s*([\s\S]*?)(?=\n\n|\n\s*\n|\n\*\*|\n## |$)/i);
+  if (physicalExamMatch && physicalExamMatch[1]) {
+    const physicalExamText = physicalExamMatch[1].trim().replace(/\*\*/g, '');
+    presentationData.physicalExam = []; // Clear previous attempts if section is found
+
+    // Check if there's a direct list of systems and findings
+    if (physicalExamText.includes(':') && physicalExamText.includes('\n')) {
+        const systemLines = physicalExamText.split('\n')
+            .filter(line => line.trim() && line.includes(':')) // Ensure line has a colon
+            .map(line => line.trim().replace(/^[•\-*]\s+/, ''));
+        
+        systemLines.forEach(line => {
+            const systemMatch = line.match(/^([^:]+?)\s*:\s*(.*)/);
+            if (systemMatch) {
+                const [_, systemName, findings] = systemMatch;
+                if (systemName.trim().length > 0 && findings.trim().length > 0) {
+                    presentationData.physicalExam.push({
+                        system: systemName.trim(),
+                        findings: findings.trim(),
+                        isAbnormal: isLikelyAbnormal(findings.trim())
+                    });
+                }
+            }
+        });
+        // If parsing yielded results, assume this format is correct
+        if (presentationData.physicalExam.length > 0) { 
+             // Successfully parsed system: finding format
+        } else {
+             // Fallback if colon format failed despite colons being present
+             parsePhysicalExamLineByLine(physicalExamText, presentationData.physicalExam);
+        }
+    } else {
+        // Fallback: Parse line by line, inferring system
+        parsePhysicalExamLineByLine(physicalExamText, presentationData.physicalExam);
+    }
   }
   
+  // --- Initial Assessment Parsing --- 
+  // Ensure this block exists and is robust
+  const initialAssessmentMatch = text.match(/(?:\*\*)?(?:Initial [Aa]ssessment|Assessment)(?:\*\*)?:?\s*([\s\S]*?)(?=\n\n|\n\s*\n|\n\*\*|\n## |$)/i);
+  if (initialAssessmentMatch && initialAssessmentMatch[1]) {
+    presentationData.initialAssessment = initialAssessmentMatch[1].trim().replace(/^[•\-*]\s+/, '');
+  }
+  
+  // --- Fallback Diagnostic Studies Parsing --- 
+  // (Keep existing fallback logic but ensure it runs *after* labs and doesn't duplicate)
+  // ... existing fallback diagnostic code ... 
+  
   return presentationData;
+}
+
+/**
+ * Helper function to parse physical exam line by line, inferring system
+ */
+function parsePhysicalExamLineByLine(physicalExamText: string, physicalExamArray: any[]) {
+    const examLines = physicalExamText.split('\n')
+        .filter(line => line.trim() && line.trim().length > 3) // Ignore short/empty lines
+        .map(line => line.trim().replace(/^[•\-*]\s+/, ''));
+      
+    examLines.forEach(line => {
+        // Try to infer system from the line content
+        let system = 'General'; // Default
+        const lineLower = line.toLowerCase();
+
+        if (lineLower.includes('respiratory') || lineLower.includes('lung') || 
+            lineLower.includes('breath') || lineLower.includes('chest') || lineLower.includes('auscultation')) {
+          system = 'Respiratory';
+        } else if (lineLower.includes('cardiovascular') || lineLower.includes('heart') || 
+                  lineLower.includes('cardiac') || lineLower.includes('pulse') || lineLower.includes('murmur') || lineLower.includes('rhythm')) {
+          system = 'Cardiovascular';
+        } else if (lineLower.includes('neuro') || lineLower.includes('mental status') || 
+                  lineLower.includes('gcs') || lineLower.includes('consciousness') || lineLower.includes('oriented') || lineLower.includes('reflex')) {
+          system = 'Neurological';
+        } else if (lineLower.includes('abdom') || lineLower.includes('bowel') || 
+                  lineLower.includes('gi') || lineLower.includes('tender') || lineLower.includes('distended')) {
+          system = 'Abdominal'; // Be careful with 'tender' - might need context
+        } else if (lineLower.includes('skin') || lineLower.includes('integumentary') || lineLower.includes('mucous membrane')) {
+          system = 'Skin/Mucous Membranes';
+        } else if (lineLower.includes('extremit') || lineLower.includes('musculoskeletal') || 
+                  lineLower.includes('msk') || lineLower.includes('edema') || lineLower.includes('pulses')) {
+          system = 'Extremities/Musculoskeletal';
+        } else if (lineLower.includes('heent') || lineLower.includes('head') || lineLower.includes('eye') || lineLower.includes('ear') || lineLower.includes('nose') || lineLower.includes('throat')) {
+          system = 'HEENT';
+        } else if (lineLower.includes('general appearance') || lineLower.includes('appears') || lineLower.includes('stated age')) {
+             system = 'General Appearance';
+        }
+        
+        // Avoid adding duplicates
+        if (!physicalExamArray.some(e => e.findings === line)) {
+             physicalExamArray.push({
+                 system,
+                 findings: line,
+                 isAbnormal: isLikelyAbnormal(line)
+             });
+        }
+    });
 }
 
 /**
