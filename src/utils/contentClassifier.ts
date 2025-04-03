@@ -32,7 +32,7 @@ export function classifyContent(content: string): TabCategory {
   const lowerContent = content.toLowerCase();
   
   // Educational/simulation related keywords - check these first as they are more specific
-  if (lowerContent.match(/simulation|learning|education|competency|objective|skill|training|assessment|evaluation|scenario|debriefing|teaching|pitfall|decision point|key point|key decision|critical action/i)) {
+  if (lowerContent.match(/simulation|learning|education|competency|objective|skill|training|assessment|evaluation|scenario|debriefing|teaching|pitfall|decision point|key point|key decision|critical action|questions to discuss|expected outcome|anticipated outcome/i)) {
     return 'simulation';
   }
   

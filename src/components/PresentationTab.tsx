@@ -93,6 +93,35 @@ function PresentationTab({ presentationData, dynamicSections = [] }: Presentatio
     }
   ];
   
+  // Convert initial assessment text to a list of bullet points
+  const formatInitialAssessment = (text: string): string[] => {
+    if (!text) return [];
+    
+    // If already has bullet points, parse them
+    if (text.includes('\n-') || text.includes('\n•') || text.includes('\n*')) {
+      return text
+        .split('\n')
+        .map(line => line.trim().replace(/^[-•*]\s*/, ''))
+        .filter(line => line.length > 0);
+    }
+    
+    // If has periods or semicolons, split by those
+    if (text.includes('. ') || text.includes('; ')) {
+      return text
+        .split(/[.;]/)
+        .map(item => item.trim())
+        .filter(item => item.length > 0);
+    }
+    
+    // Otherwise, just return the whole text as a single item
+    return [text];
+  };
+  
+  // Filter out physical exam entries that are actually initial assessments
+  const filteredPhysicalExam = physicalExam.filter(finding => 
+    !finding.system.toLowerCase().includes('initial assessment')
+  );
+  
   return (
     <div className="space-y-6">
       {/* Vital Signs Section */}
@@ -128,35 +157,25 @@ function PresentationTab({ presentationData, dynamicSections = [] }: Presentatio
               );
             })}
           </dl>
-          
-          {/* Additional vital signs beyond the standard 5 */}
-          {vitalSigns.length > 5 && (
-            <div className="mt-6 border-t border-gray-200 pt-6">
-              <h4 className="text-sm font-medium text-gray-500">Additional Vital Signs</h4>
-              <dl className="mt-3 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {vitalSigns.filter(vs => 
-                  !standardVitalSigns.some(std => 
-                    vs.name.toLowerCase().includes(std.searchTerms.split('|')[0])
-                  )
-                ).map((vital, index) => (
-                  <div 
-                    key={`additional-vs-${index}`}
-                    className={`overflow-hidden rounded-lg bg-white px-4 py-3 shadow-sm ${
-                      vital.isAbnormal ? 'ring-1 ring-red-500' : ''
-                    }`}
-                  >
-                    <dt className="truncate text-sm font-medium text-gray-500">{vital.name}</dt>
-                    <dd className="mt-1 text-xl font-medium tracking-tight text-gray-900">
-                      {vital.value}
-                      {vital.unit && <span className="ml-1 text-sm font-normal text-gray-500">{vital.unit}</span>}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-          )}
         </div>
       </div>
+
+      {/* Initial Assessment Section (if available) */}
+      {initialAssessment && (
+        <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
+          <div className="px-4 py-5 sm:px-6">
+            <h3 className="text-lg font-semibold text-gray-900">Initial Assessment</h3>
+            <p className="mt-1 max-w-2xl text-sm text-gray-500">Clinician's initial impression</p>
+          </div>
+          <div className="border-t border-gray-200 px-4 py-5 sm:p-6">
+            <ul className="list-disc pl-5 space-y-2">
+              {formatInitialAssessment(initialAssessment).map((point, index) => (
+                <li key={index} className="text-sm text-gray-900">{point}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
 
       {/* Physical Examination Section */}
       <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
@@ -166,7 +185,7 @@ function PresentationTab({ presentationData, dynamicSections = [] }: Presentatio
         </div>
         <div className="border-t border-gray-200">
           <dl className="divide-y divide-gray-200">
-            {physicalExam.map((finding, index) => (
+            {filteredPhysicalExam.map((finding, index) => (
               <div key={index} className="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                 <dt className="text-sm font-medium text-gray-500">{finding.system}</dt>
                 <dd className={`mt-1 text-sm sm:col-span-2 sm:mt-0 ${
@@ -179,19 +198,6 @@ function PresentationTab({ presentationData, dynamicSections = [] }: Presentatio
           </dl>
         </div>
       </div>
-
-      {/* Initial Assessment Section (if available) */}
-      {initialAssessment && (
-        <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
-          <div className="px-4 py-5 sm:px-6">
-            <h3 className="text-lg font-semibold text-gray-900">Initial Assessment</h3>
-            <p className="mt-1 max-w-2xl text-sm text-gray-500">Clinician's initial impression</p>
-          </div>
-          <div className="border-t border-gray-200 px-4 py-5 sm:p-6">
-            <p className="text-sm text-gray-900 whitespace-pre-line">{initialAssessment}</p>
-          </div>
-        </div>
-      )}
 
       {/* Diagnostic Studies Section */}
       <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
@@ -329,7 +335,9 @@ function PresentationTab({ presentationData, dynamicSections = [] }: Presentatio
       {dynamicSections.filter(section => 
         !section.title.toLowerCase().includes('pitfall') && 
         !section.title.toLowerCase().includes('decision point') &&
-        !section.title.toLowerCase().includes('key decision')
+        !section.title.toLowerCase().includes('key decision') &&
+        !section.title.toLowerCase().includes('questions to discuss') &&
+        !section.title.toLowerCase().includes('expected outcome')
       ).length > 0 && (
         <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
           <div className="px-4 py-5 sm:px-6">
@@ -341,7 +349,9 @@ function PresentationTab({ presentationData, dynamicSections = [] }: Presentatio
               sections={dynamicSections.filter(section => 
                 !section.title.toLowerCase().includes('pitfall') && 
                 !section.title.toLowerCase().includes('decision point') &&
-                !section.title.toLowerCase().includes('key decision')
+                !section.title.toLowerCase().includes('key decision') &&
+                !section.title.toLowerCase().includes('questions to discuss') &&
+                !section.title.toLowerCase().includes('expected outcome')
               )} 
             />
           </div>

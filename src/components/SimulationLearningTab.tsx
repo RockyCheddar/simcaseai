@@ -55,7 +55,7 @@ function SimulationLearningTab({ simulationData, dynamicSections = [] }: Simulat
   const criticalThinkingAssessments = skillsAssessment.filter(a => a.category === 'criticalThinking');
   const communicationAssessments = skillsAssessment.filter(a => a.category === 'communication');
   
-  // Extract Common Pitfalls and Key Decision Points from dynamic sections
+  // Extract sections from dynamic sections
   const commonPitfallsSections = dynamicSections.filter(section => 
     section.title.toLowerCase().includes('pitfall') ||
     section.title.toLowerCase().includes('common error')
@@ -66,10 +66,23 @@ function SimulationLearningTab({ simulationData, dynamicSections = [] }: Simulat
     section.title.toLowerCase().includes('key decision')
   );
   
-  // Remaining dynamic sections after removing pitfalls and decision points
+  const questionsToDiscussSections = dynamicSections.filter(section => 
+    section.title.toLowerCase().includes('questions to discuss') ||
+    section.title.toLowerCase().includes('discussion questions')
+  );
+  
+  const expectedOutcomesSections = dynamicSections.filter(section => 
+    section.title.toLowerCase().includes('expected outcome') ||
+    section.title.toLowerCase().includes('anticipated outcome') ||
+    section.title.toLowerCase().includes('learning outcome')
+  );
+  
+  // Remaining dynamic sections after removing filtered sections
   const remainingDynamicSections = dynamicSections.filter(section => 
     !commonPitfallsSections.includes(section) && 
-    !keyDecisionPointsSections.includes(section)
+    !keyDecisionPointsSections.includes(section) &&
+    !questionsToDiscussSections.includes(section) &&
+    !expectedOutcomesSections.includes(section)
   );
   
   return (
@@ -117,6 +130,62 @@ function SimulationLearningTab({ simulationData, dynamicSections = [] }: Simulat
           </ul>
         </div>
       </div>
+
+      {/* Questions to Discuss Section (from dynamic content) */}
+      {questionsToDiscussSections.length > 0 && (
+        <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
+          <div className="px-4 py-5 sm:px-6">
+            <h3 className="text-lg font-semibold text-gray-900">Questions to Discuss with Learners</h3>
+            <p className="mt-1 max-w-2xl text-sm text-gray-500">Key questions for facilitated discussion</p>
+          </div>
+          <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
+            {questionsToDiscussSections.map((section, idx) => (
+              <div key={idx} className="mb-6 last:mb-0">
+                {section.title !== "Questions to Discuss" && section.title !== "Discussion Questions" && (
+                  <h4 className="text-base font-medium text-gray-700 mb-2">{section.title}</h4>
+                )}
+                {Array.isArray(section.content) ? (
+                  <ol className="list-decimal pl-5 space-y-2">
+                    {section.content.map((item, i) => (
+                      <li key={i} className="text-sm text-gray-700">{item}</li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="text-sm text-gray-700 whitespace-pre-line">{section.content}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Expected Outcomes Section (from dynamic content) */}
+      {expectedOutcomesSections.length > 0 && (
+        <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
+          <div className="px-4 py-5 sm:px-6">
+            <h3 className="text-lg font-semibold text-gray-900">Expected Outcomes</h3>
+            <p className="mt-1 max-w-2xl text-sm text-gray-500">Anticipated results and learning objectives</p>
+          </div>
+          <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
+            {expectedOutcomesSections.map((section, idx) => (
+              <div key={idx} className="mb-6 last:mb-0">
+                {section.title !== "Expected Outcomes" && section.title !== "Anticipated Outcomes" && (
+                  <h4 className="text-base font-medium text-gray-700 mb-2">{section.title}</h4>
+                )}
+                {Array.isArray(section.content) ? (
+                  <ol className="list-decimal pl-5 space-y-2">
+                    {section.content.map((item, i) => (
+                      <li key={i} className="text-sm text-gray-700">{item}</li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="text-sm text-gray-700 whitespace-pre-line">{section.content}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Key Decision Points Section (from dynamic content) */}
       {keyDecisionPointsSections.length > 0 && (
