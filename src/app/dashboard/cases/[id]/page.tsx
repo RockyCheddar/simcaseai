@@ -633,6 +633,7 @@ export default function CaseDetailPage({ params }: { params: { id: string } }) {
                   { name: 'Presentation', current: false },
                   { name: 'Treatment', current: false },
                   { name: 'Simulation Learning', current: false },
+                  { name: 'Raw Output', current: false }
                 ]}
                 caseData={{
                   title: caseData.title,

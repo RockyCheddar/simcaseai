@@ -7,6 +7,7 @@ import PatientInfoTab from './PatientInfoTab';
 import PresentationTab from './PresentationTab';
 import TreatmentTab from './TreatmentTab';
 import SimulationLearningTab from './SimulationLearningTab';
+import MarkdownPreview from './MarkdownPreview';
 
 interface TabDefinition {
   name: string;
@@ -78,6 +79,11 @@ interface CaseTabsProps {
 }
 
 export default function CaseTabs({ tabs, caseData, children }: CaseTabsProps) {
+  const expectedTabCount = 6;
+  if (tabs.length !== expectedTabCount) {
+    console.error(`CaseTabs expects ${expectedTabCount} tabs, but received ${tabs.length}. Check tab definitions.`);
+  }
+
   return (
     <div className="w-full">
       <Tab.Group>
@@ -194,6 +200,14 @@ export default function CaseTabs({ tabs, caseData, children }: CaseTabsProps) {
                 }}
                 dynamicSections={caseData.dynamicSections.simulation}
               />
+            </Tab.Panel>
+
+            {/* Raw Output Tab */}
+            <Tab.Panel>
+              <div className="bg-white p-6 rounded-lg shadow-md">
+                <h2 className="text-xl font-semibold mb-4 text-gray-900">Raw AI Output (Markdown)</h2>
+                <MarkdownPreview markdown={caseData.rawText} /> 
+              </div>
             </Tab.Panel>
             
             {/* Render any custom panels */}
