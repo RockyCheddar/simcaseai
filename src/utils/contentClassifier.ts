@@ -592,6 +592,12 @@ function parsePhysicalExamLineByLine(physicalExamText: string, physicalExamArray
         let system = 'General'; // Default
         const lineLower = line.toLowerCase();
 
+        // Filter out NEWS score lines explicitly
+        if (lineLower.includes('news score') || lineLower.match(/(systolic bp|heart rate|respiratory rate|oxygen saturation|temperature)\s*\(\d+/i)) {
+             console.log("Skipping NEWS score related line in PE:", line);
+             return; // Skip this line
+        }
+
         if (lineLower.includes('respiratory') || lineLower.includes('lung') || 
             lineLower.includes('breath') || lineLower.includes('chest') || lineLower.includes('auscultation')) {
           system = 'Respiratory';
@@ -613,6 +619,9 @@ function parsePhysicalExamLineByLine(physicalExamText: string, physicalExamArray
           system = 'HEENT';
         } else if (lineLower.includes('general appearance') || lineLower.includes('appears') || lineLower.includes('stated age')) {
              system = 'General Appearance';
+        } else if (lineLower.includes('impression') || lineLower.includes('plan')) {
+             console.log("Skipping Impression/Plan line in PE:", line);
+             return; // Skip impression/plan lines often misplaced here
         }
         
         // Avoid adding duplicates

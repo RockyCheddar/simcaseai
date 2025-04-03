@@ -333,8 +333,8 @@ export function useAICase() {
         
         7. ## Case Documentation
            - Include sample documentation based on the specified documentation types
-           - Laboratory results (if applicable)
-           - Diagnostic findings (if applicable)
+           - **Include relevant laboratory results under a dedicated markdown header: '### Laboratory Results' (even if normal).** If no labs are ordered, state "No labs ordered".
+           - Include relevant diagnostic findings (e.g., imaging) under a dedicated markdown header: '### Diagnostic Findings'.
         
         8. ## Educational Notes
            - Specific teaching points related to the case
