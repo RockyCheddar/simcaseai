@@ -122,6 +122,35 @@ function PresentationTab({ presentationData, dynamicSections = [] }: Presentatio
     !finding.system.toLowerCase().includes('initial assessment')
   );
   
+  // Filter dynamic sections to remove already structured content
+  const structuredSectionTitles = [
+      'vital signs', 
+      'vitals', 
+      'initial assessment', 
+      'assessment',
+      'physical examination', 
+      'physical exam',
+      'diagnostic studies',
+      'laboratory results',
+      'lab results',
+      'labs',
+      'imaging',
+      'doctor notes' // Add any other titles that have dedicated structured sections
+  ];
+  
+  const filteredDynamicSections = dynamicSections.filter(section => {
+    const titleLower = section.title.toLowerCase();
+    // Keep the section if its title does NOT match any of the known structured titles
+    // AND if it's not educational content meant for the Simulation tab
+    return !structuredSectionTitles.some(structuredTitle => titleLower.includes(structuredTitle)) &&
+           !titleLower.includes('pitfall') && 
+           !titleLower.includes('decision point') &&
+           !titleLower.includes('key decision') &&
+           !titleLower.includes('questions to discuss') &&
+           !titleLower.includes('expected outcome') &&
+           !titleLower.includes('anticipated outcome');
+  });
+  
   return (
     <div className="space-y-6">
       {/* Vital Signs Section */}
@@ -331,29 +360,15 @@ function PresentationTab({ presentationData, dynamicSections = [] }: Presentatio
         </div>
       )}
 
-      {/* Dynamic Content Section - Filter out content that should be in other tabs */}
-      {dynamicSections.filter(section => 
-        !section.title.toLowerCase().includes('pitfall') && 
-        !section.title.toLowerCase().includes('decision point') &&
-        !section.title.toLowerCase().includes('key decision') &&
-        !section.title.toLowerCase().includes('questions to discuss') &&
-        !section.title.toLowerCase().includes('expected outcome')
-      ).length > 0 && (
+      {/* Dynamic Content Section - Filtered */}
+      {filteredDynamicSections.length > 0 && (
         <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg">
           <div className="px-4 py-5 sm:px-6">
             <h3 className="text-lg font-semibold text-gray-900">Additional Information</h3>
-            <p className="mt-1 max-w-2xl text-sm text-gray-500">Generated content from case analysis</p>
+            <p className="mt-1 max-w-2xl text-sm text-gray-500">Other generated content from case analysis</p>
           </div>
           <div className="border-t border-gray-200">
-            <DynamicContentSection 
-              sections={dynamicSections.filter(section => 
-                !section.title.toLowerCase().includes('pitfall') && 
-                !section.title.toLowerCase().includes('decision point') &&
-                !section.title.toLowerCase().includes('key decision') &&
-                !section.title.toLowerCase().includes('questions to discuss') &&
-                !section.title.toLowerCase().includes('expected outcome')
-              )} 
-            />
+            <DynamicContentSection sections={filteredDynamicSections} />
           </div>
         </div>
       )}
