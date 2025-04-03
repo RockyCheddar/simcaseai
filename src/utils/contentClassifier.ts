@@ -286,6 +286,9 @@ export function enhancedParsePatientInfoSection(patientInfoText: string): Record
  * Parse presentation section text into structured data
  */
 export function parsePresentationData(text: string): Record<string, any> {
+  console.log("--- Starting parsePresentationData ---"); // LOG START
+  console.log("Input Text Snippet:", text.substring(0, 500)); // LOG INPUT
+  
   const presentationData: Record<string, any> = {
     vitalSigns: [],
     physicalExam: [],
@@ -459,40 +462,62 @@ export function parsePresentationData(text: string): Record<string, any> {
     return null; // Return null if no match at all
 };
 
-  // Look for a laboratory results section more broadly
-  const labResultsMatch = text.match(/(?:\*\*)?(?:Laboratory Results?|Lab Results?|Labs|Diagnostics|Studies|Complete Blood Count|Metabolic Panel)(?:\*\*)?:?\s*([\s\S]*?)(?=\n\n|\n\s*\n|\n\*\*|\n## |$)/i);
+  // Look for a laboratory results section more broadly - ENHANCED Regex
+  const labSectionHeaders = [
+    'Laboratory Results?',
+    'Lab Results?',
+    'Labs',
+    'Diagnostics',
+    'Diagnostic Studies',
+    'Studies',
+    'Complete Blood Count',
+    '(Comprehensive |Basic )?Metabolic Panel',
+    'CMP',
+    'BMP'
+  ].join('|');
+  
+  const labResultsMatch = text.match(new RegExp(`(?:\\*\\*)?(?:${labSectionHeaders})(?:\\*\\*)?:?\\s*([\\s\\S]*?)(?=\n\n|\n\\s*\n|\n\\*\\*|\n## |$)`, 'i'));
   
   if (labResultsMatch && labResultsMatch[1]) {
     const labResultsText = labResultsMatch[1].trim().replace(/\*\*/g, '');
+    console.log("--- Lab Section Found ---"); // LOG SECTION FOUND
+    console.log("Lab Text:", labResultsText); // LOG LAB TEXT
+    
     const labLines = labResultsText.split('\n')
-      .filter(line => line.trim() && line.trim().length > 3) // Filter empty and very short lines
+      .filter(line => line.trim() && line.trim().length > 3) 
       .map(line => line.trim());
     
-    let isParsingLabs = false;
-    labLines.forEach(line => {
+    console.log("Processing Lab Lines:", labLines.length); // LOG LINE COUNT
+    let isParsingLabs = false; 
+    labLines.forEach((line, index) => {
+      console.log(`Line ${index}:`, line); // LOG EACH LINE
+      
       // Skip common headers/metadata lines within the lab section
       if (line.match(/^(?:Results|Specimen|Collection|Date|Time|Panel)/i) || 
-          line.match(/^\s*(?:Complete Blood Count|Metabolic Panel|Chemistry Panel)/i) ||
-          line.match(/^[-=]+$/) || // Skip separator lines
-          !line.includes(':')) { // Skip lines without a colon, likely headers or descriptions
-          // If we encounter a known panel header, start parsing labs
-          if (line.match(/^\s*(?:Complete Blood Count|Metabolic Panel|Chemistry Panel|Laboratory Results)/i)) {
-              isParsingLabs = true;
+          line.match(/^\s*(?:${labSectionHeaders})/i) ||
+          line.match(/^[-=]+$/) || 
+          !line.includes(':')) { 
+          console.log(`Skipping header/irrelevant line ${index}`); // LOG SKIP
+          if (line.match(/^\s*(?:${labSectionHeaders})/i)) {
+              isParsingLabs = true; // Start parsing after a known header
+              console.log(`Detected Header - isParsingLabs set to true`); // LOG PARSING START
           }
           return;
       }
       
-      // Start parsing seriously once we're past initial headers or hit a known panel
-      if (isParsingLabs || line.match(/^\s*[A-Z]/i)) { // Heuristic: lab names often start capitalized
+      if (isParsingLabs || line.match(/^\s*[A-Z]/i)) {
           const parsedLab = parseLabLine(line);
+          console.log(`Parse Result ${index}:`, parsedLab); // LOG PARSE RESULT
           if (parsedLab) {
-            // Avoid duplicates if AI repeats labs under different headers
             if (!presentationData.diagnosticStudies.some((existing: DiagnosticStudy) => existing.name === parsedLab.name)) {
                 presentationData.diagnosticStudies.push(parsedLab);
+                console.log(`Added Lab: ${parsedLab.name}`); // LOG ADDED
             }
           } 
       }
     });
+  } else {
+      console.log("--- Lab Section NOT Found --- Using labSectionHeaders:", labSectionHeaders); // LOG SECTION NOT FOUND
   }
   
   // --- Physical Examination Parsing --- 
@@ -542,9 +567,15 @@ export function parsePresentationData(text: string): Record<string, any> {
   }
   
   // --- Fallback Diagnostic Studies Parsing --- 
-  // (Keep existing fallback logic but ensure it runs *after* labs and doesn't duplicate)
-  // ... existing fallback diagnostic code ... 
+  // (Keep existing fallback logic but ensure it logs if run)
+  const diagnosticStudiesMatch = text.match(/(?:\*\*)?(?:Diagnostic [Ss]tudies|Imaging Results?)(?:\*\*)?:?\s*([\s\S]*?)(?=\n\n|\n\s*\n|\n\*\*|\n## |$)/i);
+  if (diagnosticStudiesMatch && diagnosticStudiesMatch[1]) {
+      console.log("--- Fallback Diagnostic Section Found ---"); // LOG FALLBACK RUN
+      // ... existing fallback logic ...
+  }
   
+  console.log("--- Finished parsePresentationData ---"); // LOG END
+  console.log("Final diagnosticStudies:", presentationData.diagnosticStudies); // LOG FINAL DATA
   return presentationData;
 }
 
